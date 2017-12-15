@@ -2,9 +2,13 @@
 
 - Bonding provides a method for aggregating multiple network interfaces into a single logical "bonded" interface.
 
-- Linx Bonding drivers provides various flavour of bonded interface depending on the mode (bonding policies), such as round robin, active aggregation according to the 802.3 ad specification
+- Linux Bonding drivers provides various flavour of bonded interface depending on the mode (bonding policies), such as round robin, active aggregation according to the 802.3 ad specification
 
-- Bonding CNI plugin works currently with SRIOV CNI and Multus CNI plugin, standalone is WIP
+- In standalone, Bonding CNI get the physical interfaces from the host network namespace and creates bond interface in the container network namespace
+
+- In the example, Bonding CNI plugin works currently with SRIOV CNI and Multus CNI plugin to create the bond interface.
+
+- Major usecase is network rebundancy for the application in the containers in case of a network device or path failure and unavailability. For more information - refer [network redundancy using interface bonding](https://www.howtoforge.com/tutorial/how-to-configure-high-availability-and-network-bonding-on-linux/)
 
 - For more information on the bonding driver. Please refer to [kernel doc](https://www.kernel.org/doc/Documentation/networking/bonding.txt)
 
@@ -16,7 +20,7 @@ This plugin is recommended to build with Go 1.7.5 which is fully tested.
 #./build
 ```
 
-Build the source codes to binary, copy the bin/vhostuser to the CNI folder for the tests.
+Build the source codes to binary, copy the bin/bond to the CNI folder for the tests.
 
 ## Network configuration reference
 
