@@ -184,8 +184,8 @@ Interface name | Description
 ------------ | -------------
 lo | loopback
 eth0 | Flannel network tap interface
-net0 | Shared VF assigned to the container by [SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni) plugin
-net0d1 | Shared VF assigned to the container by [SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni) plugin
+net0 | Shared VF assigned to the container by [SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni) plugin from phy port 1
+net0d1 | Shared VF assigned to the container by [SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni) plugin from phy port 2
 bond0 | bond interface from "net0" and "net0d1"
 
 ### Contacts
