@@ -26,7 +26,7 @@ Build the source codes to binary, copy the bin/bond to the CNI folder for the te
 
 * `name` (string, required): the name of the network
 * `type` (string, required): "bond"
-* `ifname` (string, required): name of the bond interface
+* `ifname` (string, optional): name of the bond interface
 * `miimon` (int, required): specifies the arp link monitoring frequency in milliseconds
 * `links` (dictionary, required): master interface names.
 * `ipam` (dictionary, required): IPAM configuration to be used for this network.
