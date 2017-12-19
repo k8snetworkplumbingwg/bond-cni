@@ -32,6 +32,29 @@ Build the source codes to binary, copy the bin/bond to the CNI folder for the te
 * `ipam` (dictionary, required): IPAM configuration to be used for this network.
 
 ## Usage
+### Work standalone
+
+Given the following network configuration:
+
+```
+# cat > /etc/cni/net.d/00-flannel-bonding.conf <<EOF
+{
+	{
+        "name": "mynet",
+        "type": "flannel",
+        "delegate": {
+                "type": "bond",
+                "mode": "active-backup",
+                "miimon": "100",
+                "links": [
+                        {"name": "ens3f2"},
+                        {"name": "ens3f2d1"}
+                ]
+        }
+}
+EOF
+```
+
 ### Integrated with Multus plugin and  SRIOV CNI for high performance container Networking solution for NFV Environment 
 
 Refer Multus (NFV based Multi - Network plugin), DPDK-SRIOV CNI plugins
@@ -56,7 +79,7 @@ Please refer the Kubernetes Network SIG - Multiple Network PoC proposal for more
             "if0name": "net0"
         },
         {
-            "type": "bond_ipam",
+            "type": "bond",
             "ifname": "bond0",
             "mode": "active-backup",
              "miimon": "100",
