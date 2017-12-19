@@ -6,8 +6,6 @@
 
 - In standalone, Bonding CNI get the physical interfaces from the host network namespace and creates bond interface in the container network namespace
 
-- In the example, Bonding CNI plugin works currently with SRIOV CNI and Multus CNI plugin to create the bond interface.
-
 - Major usecase is network rebundancy for the application in the containers in case of a network device or path failure and unavailability. For more information - refer [network redundancy using interface bonding](https://www.howtoforge.com/tutorial/how-to-configure-high-availability-and-network-bonding-on-linux/)
 
 - For more information on the bonding driver. Please refer to [kernel doc](https://www.kernel.org/doc/Documentation/networking/bonding.txt)
@@ -55,7 +53,9 @@ Given the following network configuration:
 EOF
 ```
 
-### Integrated with Multus plugin and  SRIOV CNI for high performance container Networking solution for NFV Environment 
+### Integrated with Multus plugin and  SRIOV CNI for high performance container Networking solution for NFV Environment
+
+- In the example, Bonding CNI plugin works with SRIOV CNI and Multus CNI plugin to create the bond interface.
 
 Refer Multus (NFV based Multi - Network plugin), DPDK-SRIOV CNI plugins
 * [Multus - Multi Network plugin](https://github.com/Intel-Corp/multus-cni)
