@@ -6,7 +6,7 @@
 
 - In standalone, Bonding CNI get the physical interfaces from the host network namespace and creates bond interface in the container network namespace
 
-- Major usecase is network rebundancy for the application in the containers in case of a network device or path failure and unavailability. For more information - refer [network redundancy using interface bonding](https://www.howtoforge.com/tutorial/how-to-configure-high-availability-and-network-bonding-on-linux/)
+- Major usecase is network redundancy for the application in the containers in case of a network device or path failure and unavailability. For more information - refer [network redundancy using interface bonding](https://www.howtoforge.com/tutorial/how-to-configure-high-availability-and-network-bonding-on-linux/)
 
 - For more information on the bonding driver. Please refer to [kernel doc](https://www.kernel.org/doc/Documentation/networking/bonding.txt)
 
@@ -68,45 +68,53 @@ Please refer the Kubernetes Network SIG - Multiple Network PoC proposal for more
 ### Configuration details
 ```
 # cat > /etc/cni/net.d/00-multus.conf <<EOF
-{
-    "name": "multus-demo-network",
-    "type": "multus",
-    "delegates": [
+{                                                                        
+    "name": "multus-demo-network",                                       
+    "type": "multus",                                                    
+    "delegates": [                                                       
         {
             "type": "sriov",
-            "if0": "ens3",
-            "l2enable": true,
-            "if0name": "net0"
+            "if0": "ens6f0",
+            "if0name": "net0",
+            "l2enable": true
+        },
+        {
+            "type": "sriov",
+            "if0": "ens6f3",
+            "if0name": "net1",
+            "l2enable": true
         },
         {
             "type": "bond",
             "ifname": "bond0",
             "mode": "active-backup",
-             "miimon": "100",
+            "miimon": "100",
             "links": [
                     {"name": "net0"},
-                    {"name": "net0d1"}
+                    {"name": "net1"}
             ],
+
             "ipam": {
-                    "type": "host-local",
-                    "subnet": "10.168.1.0/24",
-                    "rangeStart": "10.168.1.11",
-                    "rangeEnd": "10.168.1.20",
-                    "routes": [
-                            { "dst": "0.0.0.0/0" }
-                    ],
-                   "gateway": "10.168.1.1"
+                 "type": "host-local",
+                 "subnet": "192.168.1.0/24",
+                 "rangeStart": "192.168.1.21",
+                 "rangeEnd": "192.168.1.30",
+                 "routes": [
+                      { "dst": "0.0.0.0/0" }
+                 ],
+                 "gateway": "192.168.1.1"
             }
         },
         {
             "type": "flannel",
-   	    "name": "control-network",
+            "name": "control-network",
             "masterplugin": true,
             "delegate": {
                     "isDefaultGateway": true
-    	    }
+            }
         }
     ]
+}
 }
 EOF
 ```
@@ -172,7 +180,7 @@ net0      Link encap:Ethernet  HWaddr 52:00:54:89:42:02
           collisions:0 txqueuelen:1000
           RX bytes:0 (0.0 B)  TX bytes:1296 (1.2 KiB)
 
-net0d1    Link encap:Ethernet  HWaddr 52:00:54:89:42:02
+net1      Link encap:Ethernet  HWaddr 52:00:54:89:42:02
           UP BROADCAST RUNNING SLAVE MULTICAST  MTU:1500  Metric:1
           RX packets:0 errors:0 dropped:0 overruns:0 frame:0
           TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
@@ -184,9 +192,9 @@ Interface name | Description
 ------------ | -------------
 lo | loopback
 eth0 | Flannel network tap interface
-net0 | Shared VF assigned to the container by [SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni) plugin from phy port 1
-net0d1 | Shared VF assigned to the container by [SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni) plugin from phy port 2
-bond0 | bond interface from "net0" and "net0d1"
+net0 | VF assigned to the container by [SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni) plugin from phy port 1("ens6f0")
+net1 | VF assigned to the container by [SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni) plugin from phy port 4("ens6f3")
+bond0 | bond interface from "net0" and "net1"
 
 ### Contacts
 For any questions about bond CNI, please reach out on github issue or feel free to contact the developer in our [Intel-Corp Slack](https://intel-corp.herokuapp.com/)
