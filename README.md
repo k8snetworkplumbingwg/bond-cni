@@ -1,72 +1,73 @@
 # Bonding CNI plugin
 
-- Bonding provides a method for aggregating multiple network interfaces into a single logical "bonded" interface.
+- Bonding provides a method for aggregating multiple network interfaces into a single logical &quot;bonded&quot; interface.
+- According to the 802.3ad specification, Linux Bonding drivers provides various flavours of bonded interfaces depending on the mode (bonding policies), such as round robin, active aggregation
+- When Bonding CNI configured as a standalone plugin, physical interfaces are obtained from host network namespace. With these physical interfaces a bonded interface is created in container network namespace.
+- A major user case for bonding in containers is network redundancy of an application in the case of network device or path failure and unavailability. For more information - refer to [network redundancy using interface bonding](https://www.howtoforge.com/tutorial/how-to-configure-high-availability-and-network-bonding-on-linux/)
+- And for more information on the bonding driver please refer to [kernel doc](https://www.kernel.org/doc/Documentation/networking/bonding.txt)
 
-- Linux Bonding drivers provides various flavour of bonded interface depending on the mode (bonding policies), such as round robin, active aggregation according to the 802.3 ad specification
+## Build &amp; Clean
 
-- In standalone, Bonding CNI get the physical interfaces from the host network namespace and creates bond interface in the container network namespace
+This plugin is recommended to be built with Go 1.7.5 which has been fully tested.
 
-- Major usecase is network redundancy for the application in the containers in case of a network device or path failure and unavailability. For more information - refer [network redundancy using interface bonding](https://www.howtoforge.com/tutorial/how-to-configure-high-availability-and-network-bonding-on-linux/)
-
-- For more information on the bonding driver. Please refer to [kernel doc](https://www.kernel.org/doc/Documentation/networking/bonding.txt)
-
-## Build & Clean
-
-This plugin is recommended to build with Go 1.7.5 which is fully tested.
-
+- Build the source codes to binary:
 ```
 #./build
 ```
+- Copy the binary to the CNI folder for the testing:
+```
+# cp ./bin/bond /opt/cni/bin/
+```
+### Network configuration reference
 
-Build the source codes to binary, copy the bin/bond to the CNI folder for the tests.
-
-## Network configuration reference
-
-* `name` (string, required): the name of the network
-* `type` (string, required): "bond"
-* `ifname` (string, optional): name of the bond interface
-* `miimon` (int, required): specifies the arp link monitoring frequency in milliseconds
-* `links` (dictionary, required): master interface names.
-* `ipam` (dictionary, required): IPAM configuration to be used for this network.
+- name (string, required): the name of the network
+- type (string, required): &quot;bond&quot;
+- ifname (string, optional): name of the bond interface
+- miimon (int, required): specifies the arp link monitoring frequency in milliseconds
+- links (dictionary, required): master interface names
+- ipam (dictionary, required): IPAM configuration to be used for this network
 
 ## Usage
+
 ### Work standalone
 
 Given the following network configuration:
-
-```
+```json
 # cat > /etc/cni/net.d/00-flannel-bonding.conf <<EOF
 {
-	{
-        "name": "mynet",
-        "type": "flannel",
-        "delegate": {
-                "type": "bond",
-                "mode": "active-backup",
-                "miimon": "100",
-                "links": [
-                        {"name": "ens3f2"},
-                        {"name": "ens3f2d1"}
-                ]
-        }
+	"name": "mynet",
+	"type": "flannel",
+	"delegate": {
+		"type": "bond",
+		"mode": "active-backup",
+		"miimon": "100",
+		"links": [
+            {
+				"name": "ens3f2"
+			},
+			{
+				"name": "ens3f2d1"
+			}
+		]
+	}
 }
 EOF
 ```
+Note: In this example configuration above required &quot;ipam&quot; is provided by flannel plugin implicitly.
 
-### Integrated with Multus plugin and  SRIOV CNI for high performance container Networking solution for NFV Environment
+### Integration with Multus and SRIOV CNI plugin
 
-- In the example, Bonding CNI plugin works with SRIOV CNI and Multus CNI plugin to create the bond interface.
+User can take advantage of [Multus](https://github.com/Intel-Corp/multus-cni) that enables adding multiple interfaces to a K8s Pod. The [sriov-dpdk](https://github.com/Intel-Corp/sriov-cni) plugin allows a SRIOV VF (Virtual Function) to be added to a container. This example shows how bond CNI could be used in conjunction with these plugins to handle more advance use cases e.g, high performance container networking solution for NFV environment.
 
-Refer Multus (NFV based Multi - Network plugin), DPDK-SRIOV CNI plugins
-* [Multus - Multi Network plugin](https://github.com/Intel-Corp/multus-cni)
-* [DPDK-SRIOV - Dataplane plugin](https://github.com/Intel-Corp/sriov-cni)
+- [Multus - Multi Network plugin](https://github.com/Intel-Corp/multus-cni)
+- [DPDK-SRIOV - Dataplane plugin](https://github.com/Intel-Corp/sriov-cni)
 
-Encourage the users/developers to use Multus based Kubernetes CDR/TPR based network objects. Please follow the configuration details in the link: [Usage with Kubernetes CRD/TPR based Network Objects](https://github.com/Intel-Corp/multus-cni/blob/master/README.md#usage-with-kubernetes-crdtpr-based-network-objects)
+Users/developers are encouraged to use kubernetes CRD/TPR based network objects with Multus.  Please follow the configuration details in the link: [Usage with Kubernetes CRD/TPR based Network Objects](https://github.com/Intel-Corp/multus-cni/blob/master/README.md#usage-with-kubernetes-crdtpr-based-network-objects)
 
-Please refer the Kubernetes Network SIG - Multiple Network PoC proposal for more details refer the link - [K8s Multiple Network proposal](https://docs.google.com/document/d/1TW3P4c8auWwYy-w_5afIPDcGNLK3LZf0m14943eVfVg/edit)
+Please refer to the [K8s Multiple Network PoC proposal](https://docs.google.com/document/d/1TW3P4c8auWwYy-w_5afIPDcGNLK3LZf0m14943eVfVg/edit)for more details.
 
 ### Configuration details
-```
+```json
 # cat > /etc/cni/net.d/00-multus.conf <<EOF
 {                                                                        
     "name": "multus-demo-network",                                       
@@ -115,13 +116,13 @@ Please refer the Kubernetes Network SIG - Multiple Network PoC proposal for more
         }
     ]
 }
-}
 EOF
 ```
 #### Launching workloads in Kubernetes
-Launch the workload using yaml file in the kubernetes master, with above configuration in the Multus CNI, SRIOV CNI and Bonding CNI, , each pod should have multiple interfaces.
 
-1. Create “multus-test.yaml” file containing below configuration. Created pod will consist of one “alpine” container running “sleep” command.
+With above Multus configuration, we can now deploy a Pod using the pod spec shown below. (Assuming bond, sriov and flannel CNI  binaries are present in default CNI location). Once successfully created, this Pod should have multiple network interfaces attached to it.
+
+1. Create &quot;multus-test.yaml&quot; file containing below configuration.
 ```
 apiVersion: v1
 kind: Pod
@@ -137,14 +138,14 @@ spec:  # specification of the pod's contents
       - "-c"
       - "sleep 60m"
     imagePullPolicy: IfNotPresent
-
 ```
-2. Create pod using command:
+2. Create pod using following command:
 ```
 # kubectl create -f multus-test.yaml
+
 pod "multus-test" created
 ```
-3. Run “ifconfig” command inside the container:
+3. Run &quot;ifconfig&quot; command inside the container:
 ```
 bond0     Link encap:Ethernet  HWaddr 52:00:54:89:42:02
           inet addr:10.168.1.12  Bcast:0.0.0.0  Mask:255.255.255.0
@@ -187,15 +188,14 @@ net1      Link encap:Ethernet  HWaddr 52:00:54:89:42:02
           collisions:0 txqueuelen:1000
           RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
 ```
-
-Interface name | Description
------------- | -------------
-lo | loopback
-eth0 | Flannel network tap interface
-net0 | VF assigned to the container by [SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni) plugin from phy port 1("ens6f0")
-net1 | VF assigned to the container by [SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni) plugin from phy port 4("ens6f3")
-bond0 | bond interface from "net0" and "net1"
+| Interface name | Description |
+| --- | --- |
+| lo | loopback |
+| eth0 | Flannel network tap interface |
+| net0 | VF assigned to the container by [SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni) plugin from phy port 1(&quot;ens6f0&quot;) |
+| net1 | VF assigned to the container by [SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni) plugin from phy port 4(&quot;ens6f3&quot;) |
+| bond0 | bond interface from &quot;net0&quot; and &quot;net1&quot; |
 
 ### Contacts
-For any questions about bond CNI, please reach out on github issue or feel free to contact the developer in our [Intel-Corp Slack](https://intel-corp.herokuapp.com/)
 
+For any questions about bond CNI, please reach out on github issue or feel free to contact the developer in our [Intel-Corp Slack](https://intel-corp.herokuapp.com/)
