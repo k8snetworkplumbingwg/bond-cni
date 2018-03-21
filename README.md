@@ -199,3 +199,8 @@ net1      Link encap:Ethernet  HWaddr 52:00:54:89:42:02
 ### Contacts
 
 For any questions about bond CNI, please reach out on github issue or feel free to contact the developer in our [Intel-Corp Slack](https://intel-corp.herokuapp.com/)
+
+### Contributors
+* Abdul Halim
+* Derek O'Connor
+* Kuralamudhan Ramakrishnan
