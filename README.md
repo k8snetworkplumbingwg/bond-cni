@@ -1,35 +1,43 @@
-# Bonding CNI plugin
+# Bond CNI plugin
 
 - Bonding provides a method for aggregating multiple network interfaces into a single logical &quot;bonded&quot; interface.
 - According to the 802.3ad specification, Linux Bonding drivers provides various flavours of bonded interfaces depending on the mode (bonding policies), such as round robin, active aggregation
-- When Bonding CNI configured as a standalone plugin, physical interfaces are obtained from host network namespace. With these physical interfaces a bonded interface is created in container network namespace.
-- A major user case for bonding in containers is network redundancy of an application in the case of network device or path failure and unavailability. For more information - refer to [network redundancy using interface bonding](https://www.howtoforge.com/tutorial/how-to-configure-high-availability-and-network-bonding-on-linux/)
+- When Bond CNI is configured as a standalone plugin, interfaces are obtained from the host network namespace. With these physical interfaces a bonded interface is created in the container network namespace.
+- When used with [Multus](https://github.com/intel/multus-cni) users can bond two interfaces that have previously been passed into the container.
+- A major use case for bonding in containers is network redundancy of an application in the case of network device or path failure and unavailability. For more information - refer to [network redundancy using interface bonding](https://www.howtoforge.com/tutorial/how-to-configure-high-availability-and-network-bonding-on-linux/)
 - And for more information on the bonding driver please refer to [kernel doc](https://www.kernel.org/doc/Documentation/networking/bonding.txt)
 
-## Build &amp; Clean
+## Build
 
-This plugin is recommended to be built with Go 1.7.5 which has been fully tested.
+It is recommended that Bond CNI be built with Go 1.7.5 which has been fully tested. Later versions of Go should also be compatible but have not been validated.
 
-- Build the source codes to binary:
+- Build the source code to binary:
+
 ```
 #./build
 ```
+
 - Copy the binary to the CNI folder for the testing:
+
 ```
 # cp ./bin/bond /opt/cni/bin/
 ```
+
+The binary should be placed at /opt/cni/bin on all nodes on which bonding will take place. That is all nodes to which a container with a bonded interface can be deployed.
+
 ### Network configuration reference
 
 - name (string, required): the name of the network
 - type (string, required): &quot;bond&quot;
 - ifname (string, optional): name of the bond interface
 - miimon (int, required): specifies the arp link monitoring frequency in milliseconds
+- linksInContainer(boolean, optional): specifies if slave links are in container to start. Default is false i.e. look for interfaces on host before bonding.
 - links (dictionary, required): master interface names
 - ipam (dictionary, required): IPAM configuration to be used for this network
 
 ## Usage
 
-### Work standalone
+### Standalone operation
 
 Given the following network configuration:
 ```json
@@ -57,150 +65,125 @@ Note: In this example configuration above required &quot;ipam&quot; is provided 
 
 ### Integration with Multus and SRIOV CNI plugin
 
-User can take advantage of [Multus](https://github.com/Intel-Corp/multus-cni) that enables adding multiple interfaces to a K8s Pod. The [sriov-dpdk](https://github.com/Intel-Corp/sriov-cni) plugin allows a SRIOV VF (Virtual Function) to be added to a container. This example shows how bond CNI could be used in conjunction with these plugins to handle more advance use cases e.g, high performance container networking solution for NFV environment.
+Users can take advantage of [Multus](https://github.com/intel/multus-cni) to enable adding multiple interfaces to a K8s Pod. The [SRIOV CNI](https://github.com/intel/sriov-cni) plugin allows a SRIOV VF (Virtual Function) to be added to a container. This example shows how Bond CNI could be used in conjunction with these plugins to handle more advanced use cases e.g, high performance container networking solution for NFV environment.
 
-- [Multus - Multi Network plugin](https://github.com/Intel-Corp/multus-cni)
-- [DPDK-SRIOV - Dataplane plugin](https://github.com/Intel-Corp/sriov-cni)
+- [Multus CNI- Multi Network plugin](https://github.com/intel/multus-cni)
+- [SRIOV CNI](https://github.com/intel/sriov-cni)
 
-Users/developers are encouraged to use kubernetes CRD/TPR based network objects with Multus.  Please follow the configuration details in the link: [Usage with Kubernetes CRD/TPR based Network Objects](https://github.com/Intel-Corp/multus-cni/blob/master/README.md#usage-with-kubernetes-crdtpr-based-network-objects)
+Configuration is based on the Multus CRD Network Attachment Definition.  Please follow the configuration details in the link: [Usage with Kubernetes CRD based Network Objects](https://github.com/intel/multus-cni/blob/master/doc/configuration.md#configuration-example)
 
-Please refer to the [K8s Multiple Network PoC proposal](https://docs.google.com/document/d/1TW3P4c8auWwYy-w_5afIPDcGNLK3LZf0m14943eVfVg/edit)for more details.
+For more information and advanced use refer to the [Network Custom Resource standard](https://docs.google.com/document/d/1TW3P4c8auWwYy-w_5afIPDcGNLK3LZf0m14943eVfVg/edithttps://docs.google.com/document/d/1Ny03h6IDVy_e_vmElOqR7UdTPAG_RNydhVE1Kx54kFQ/edit#heading=h.hylsbqoj5fxd) for more details.
 
-### Configuration details
-```json
-# cat > /etc/cni/net.d/00-multus.conf <<EOF
-{                                                                        
-    "name": "multus-demo-network",                                       
-    "type": "multus",                                                    
-    "delegates": [                                                       
-        {
-            "type": "sriov",
-            "if0": "ens6f0",
-            "if0name": "net0",
-            "l2enable": true
-        },
-        {
-            "type": "sriov",
-            "if0": "ens6f3",
-            "if0name": "net1",
-            "l2enable": true
-        },
-        {
-            "type": "bond",
-            "ifname": "bond0",
-            "mode": "active-backup",
-            "miimon": "100",
-            "links": [
-                    {"name": "net0"},
-                    {"name": "net1"}
-            ],
-
-            "ipam": {
-                 "type": "host-local",
-                 "subnet": "192.168.1.0/24",
-                 "rangeStart": "192.168.1.21",
-                 "rangeEnd": "192.168.1.30",
-                 "routes": [
-                      { "dst": "0.0.0.0/0" }
-                 ],
-                 "gateway": "192.168.1.1"
-            }
-        },
-        {
-            "type": "flannel",
-            "name": "control-network",
-            "masterplugin": true,
-            "delegate": {
-                    "isDefaultGateway": true
-            }
-        }
-    ]
-}
-EOF
-```
 #### Launching workloads in Kubernetes
 
-With above Multus configuration, we can now deploy a Pod using the pod spec shown below. (Assuming bond, sriov and flannel CNI  binaries are present in default CNI location). Once successfully created, this Pod should have multiple network interfaces attached to it.
+Prerequisites:
 
-1. Create &quot;multus-test.yaml&quot; file containing below configuration.
+- Multus configured as per the [quick start guide](https://github.com/intel/multus-cni/blob/master/doc/quickstart.md)
+
+- SRIOV CNI and Multus CNI placed in /opt/cni/bin
+
+1) Deploy Network Attach Definiton for SRIOV:
+
+```
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: sriov-net1
+spec:
+  config: '{
+  "type": "sriov",
+  "name": "sriov-network"
+  }
+}'
+```
+
+2) Deploy Network Attach Definition for Bond CNI:
+
+```
+apiVersion: "k8s.cni.cncf.io/v1"
+kind: NetworkAttachmentDefinition
+metadata:
+  name: bond-net1
+spec:
+  config: '{
+  "type": "bond",
+  "cniVersion": "0.3.1",
+  "name": "bond-net1",
+  "ifname": "bond0",
+  "mode": "active-backup",
+  "linksInContainer": true,
+  "miimon": "100",
+  "links": [
+     {"name": "net1"},
+     {"name": "net2"}
+  ],
+  "ipam": {
+    "type": "host-local",
+    "subnet": "10.56.217.0/24",
+    "routes": [{
+      "dst": "0.0.0.0/0"
+    }],
+    "gateway": "10.56.217.1"
+  }
+
+```
+Note above the `"linksInContainer": true` flag. This tells the Bond CNI that the interfaces we're looking for are to be found inside the container. By default it will look for these interfaces on the host which does not work for integration with SRIOV/Multus.
+
+3) Deploy a pod which requests two SRIOV networks and one bonded network.
+
 ```
 apiVersion: v1
 kind: Pod
 metadata:
-  name: multus-test
+  name: test-pod
+  annotations:
+    k8s.v1.cni.cncf.io/networks: sriov-net1, sriov-net1, bond-net1
 spec:  # specification of the pod's contents
   restartPolicy: Never
   containers:
-  - name: multus-test
+  - name: bond-test
     image: alpine:latest
     command:
       - /bin/sh
       - "-c"
       - "sleep 60m"
     imagePullPolicy: IfNotPresent
+
 ```
-2. Create pod using following command:
+
+The order in the request annotation `k8s.v1.cni.cncf.io/networks: sriov-net1, sriov-net1, bond-net1` is important as it is the same order in which networks will be added. In the above spec we add one SRIOV network, then we add another identically configured SRIOV network. Multus will give these networks the names net1 and net2 respectively.
+
+Next the bond-net1 network is created - using interfaces net1 and net2. If bond is created before the SRIOV networks the CNI will not be able to find the interfaces in the container.
+
+Note that the name of each interface can be set manually in the annotation according to the [CRD Spec](https://docs.google.com/document/d/1TW3P4c8auWwYy-w_5afIPDcGNLK3LZf0m14943eVfVg/edithttps://docs.google.com/document/d/1Ny03h6IDVy_e_vmElOqR7UdTPAG_RNydhVE1Kx54kFQ/edit#heading=h.hylsbqoj5fxd) 
+
+After deploying the above pod spec on Kubernetes running the following command:
+
+```kubectl exec -it test-pod -- ip a```
+
+Will result in  output like:
+
 ```
-# kubectl create -f multus-test.yaml
-
-pod "multus-test" created
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+3: eth0@if150: <BROADCAST,MULTICAST,UP,LOWER_UP,M-DOWN> mtu 1450 qdisc noqueue state UP 
+    link/ether 62:b1:b5:c8:fb:7a brd ff:ff:ff:ff:ff:ff
+    inet 10.244.1.122/24 brd 10.244.1.255 scope global eth0
+       valid_lft forever preferred_lft forever
+4: bond0: <BROADCAST,MULTICAST,UP,LOWER_UP400> mtu 1500 qdisc noqueue state UP qlen 1000
+    link/ether 9e:23:69:42:fb:8a brd ff:ff:ff:ff:ff:ff
+    inet 10.56.217.66/24 scope global bond0
+       valid_lft forever preferred_lft forever
+43: net1: <BROADCAST,MULTICAST,UP,LOWER_UP800> mtu 1500 qdisc mq master bond0 state UP qlen 1000
+    link/ether 9e:23:69:42:fb:8a brd ff:ff:ff:ff:ff:ff
+    inet 10.56.217.109/24 brd 10.56.217.255 scope global net1
+       valid_lft forever preferred_lft forever
+44: net2: <BROADCAST,MULTICAST,UP,LOWER_UP800> mtu 1500 qdisc mq master bond0 state UP qlen 1000
+    link/ether 9e:23:69:42:fb:8a brd ff:ff:ff:ff:ff:ff
+    inet 10.56.217.110/24 brd 10.56.217.255 scope global net2
+       valid_lft forever preferred_lft forever
 ```
-3. Run &quot;ifconfig&quot; command inside the container:
-```
-bond0     Link encap:Ethernet  HWaddr 52:00:54:89:42:02
-          inet addr:10.168.1.12  Bcast:0.0.0.0  Mask:255.255.255.0
-          inet6 addr: fe80::5000:54ff:fe89:4202/64 Scope:Link
-          UP BROADCAST RUNNING MASTER MULTICAST  MTU:1500  Metric:1
-          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
-          TX packets:16 errors:0 dropped:0 overruns:0 carrier:0
-          collisions:0 txqueuelen:1000
-          RX bytes:0 (0.0 B)  TX bytes:1296 (1.2 KiB)
 
-eth0      Link encap:Ethernet  HWaddr 0A:58:C0:A8:78:F6
-          inet addr:192.168.120.246  Bcast:0.0.0.0  Mask:255.255.252.0
-          inet6 addr: fe80::48a0:bff:fe9e:213/64 Scope:Link
-          UP BROADCAST RUNNING MULTICAST  MTU:1450  Metric:1
-          RX packets:96 errors:0 dropped:0 overruns:0 frame:0
-          TX packets:8 errors:0 dropped:0 overruns:0 carrier:0
-          collisions:0 txqueuelen:0
-          RX bytes:10190 (9.9 KiB)  TX bytes:648 (648.0 B)
-
-lo        Link encap:Local Loopback
-          inet addr:127.0.0.1  Mask:255.0.0.0
-          inet6 addr: ::1/128 Scope:Host
-          UP LOOPBACK RUNNING  MTU:65536  Metric:1
-          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
-          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
-          collisions:0 txqueuelen:1
-          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
-
-net0      Link encap:Ethernet  HWaddr 52:00:54:89:42:02
-          UP BROADCAST RUNNING SLAVE MULTICAST  MTU:1500  Metric:1
-          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
-          TX packets:16 errors:0 dropped:0 overruns:0 carrier:0
-          collisions:0 txqueuelen:1000
-          RX bytes:0 (0.0 B)  TX bytes:1296 (1.2 KiB)
-
-net1      Link encap:Ethernet  HWaddr 52:00:54:89:42:02
-          UP BROADCAST RUNNING SLAVE MULTICAST  MTU:1500  Metric:1
-          RX packets:0 errors:0 dropped:0 overruns:0 frame:0
-          TX packets:0 errors:0 dropped:0 overruns:0 carrier:0
-          collisions:0 txqueuelen:1000
-          RX bytes:0 (0.0 B)  TX bytes:0 (0.0 B)
-```
-| Interface name | Description |
-| --- | --- |
-| lo | loopback |
-| eth0 | Flannel network tap interface |
-| net0 | VF assigned to the container by [SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni) plugin from phy port 1(&quot;ens6f0&quot;) |
-| net1 | VF assigned to the container by [SR-IOV CNI](https://github.com/Intel-Corp/sriov-cni) plugin from phy port 4(&quot;ens6f3&quot;) |
-| bond0 | bond interface from &quot;net0&quot; and &quot;net1&quot; |
-
-### Contacts
-
-For any questions about bond CNI, please reach out on github issue or feel free to contact the developer in our [Intel-Corp Slack](https://intel-corp.herokuapp.com/)
-
-### Contributors
-* Abdul Halim
-* Derek O'Connor
-* Kuralamudhan Ramakrishnan
+We have three new interfaces added to our pod - net1 and net2 are SRIOV interfaces while bond0 is the bond over the two of them. Net1 and Net2 don't require IP addresses - and this can be changed in their CRD.
