@@ -14,7 +14,7 @@ It is recommended that Bond CNI be built with Go 1.7.5 which has been fully test
 - Build the source code to binary:
 
 ```
-#./build
+#make build-bin
 ```
 
 - Copy the binary to the CNI folder for the testing:
