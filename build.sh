@@ -17,17 +17,5 @@
 
 set -e
 
-ORG_PATH="github.com/Intel-Corp"
-REPO_PATH="${ORG_PATH}/bond-cni"
-
-if [ ! -h gopath/src/${REPO_PATH} ]; then
-	mkdir -p gopath/src/${ORG_PATH}
-	ln -s ../../../.. gopath/src/${REPO_PATH} || exit 255
-fi
-
-export GO15VENDOREXPERIMENT=1
-export GOBIN=${PWD}/bin
-export GOPATH=${PWD}/gopath
-
 echo "Building bond-cni plugins"
-go install "$@" ${REPO_PATH}/bond
+go build --mod=vendor -o ./bin/bond ./bond/
