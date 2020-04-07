@@ -23,7 +23,6 @@ import (
 	"runtime"
 
 	"strconv"
-
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
 	"github.com/containernetworking/cni/pkg/types/current"
@@ -56,6 +55,9 @@ func loadConfigFile(bytes []byte) (*bondingConfig, string, error) {
 	if err := json.Unmarshal(bytes, bondConf); err != nil {
 		return nil, "", fmt.Errorf("Failed to load configuration file, error = %+v", err)
 	}
+	if bondConf.IPAM.Type == "bond"{
+		return nil, "", fmt.Errorf("Bond is not a suitbale IPAM type")
+	}
 	return bondConf, bondConf.CNIVersion, nil
 }
 
@@ -63,8 +65,13 @@ func loadConfigFile(bytes []byte) (*bondingConfig, string, error) {
 func getLinkObjectsFromConfig(bondConf *bondingConfig, netNsHandle *netlink.Handle) ([]netlink.Link, error) {
 	linkNames := []string{}
 	for _, linkName := range bondConf.Links {
-		linkNames = append(linkNames, linkName["name"].(string))
+		s , ok := linkName["name"].(string)
+  		if !ok {
+      			return nil, fmt.Errorf("failed to find link name")
+  		}	
+  		linkNames = append(linkNames, s)
 	}
+
 	linkObjectsToBond := []netlink.Link{}
 	if len(linkNames) > 1 && len(linkNames) <= 2 { // currently only supporting two links to one bond
 		for _, linkName := range linkNames {
@@ -161,8 +168,13 @@ func setLinksinNetNs(bondConf *bondingConfig, nspath string, releaseLinks bool) 
 
 	linkNames := []string{}
 	for _, linkName := range bondConf.Links {
-		linkNames = append(linkNames, linkName["name"].(string))
+  		s , ok := linkName["name"].(string)
+   		if !ok {
+      			return fmt.Errorf("failed to find link name")
+   		}
+	   	linkNames = append(linkNames, s)
 	}
+
 
 	if netNs, err = ns.GetNS(nspath); err != nil {
 		return fmt.Errorf("failed to open netns %q: %v", nspath, err)
@@ -214,6 +226,7 @@ func createBond(bondConf *bondingConfig, nspath string, ns ns.NetNS) (*current.I
 
 	// get the namespace from the CNI_NETNS environment variable
 	netNs, err := netns.GetFromPath(nspath)
+//	netNs, err := ns.GetNs(nspath)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to retrieve netNs from path (%+v), error: %+v", nspath, err)
 	}
@@ -384,7 +397,9 @@ func cmdDel(args *skel.CmdArgs) error {
 
 	return err
 }
-
+func cmdCheck(args *skel.CmdArgs) error {
+	return nil
+}
 func main() {
-	skel.PluginMain(cmdAdd, cmdDel, version.All)
+	skel.PluginMain(cmdAdd, cmdCheck, cmdDel, version.All, "")
 }
