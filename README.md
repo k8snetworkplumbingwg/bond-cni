@@ -9,7 +9,7 @@
 
 ## Build
 
-It is recommended that Bond CNI be built with Go 1.7.5 which has been fully tested. Later versions of Go should also be compatible but have not been validated.
+It is recommended that Bond CNI be built with Go 1.12+ as dependencies are managed using go mod.
 
 - Build the source code to binary:
 
