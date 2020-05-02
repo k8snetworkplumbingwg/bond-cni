@@ -40,6 +40,7 @@ type bondingConfig struct {
 	Mode        string                   `json:"mode"`
 	LinksContNs bool                     `json:"linksInContainer"`
 	Miimon      string                   `json:"miimon"`
+	Mtu         int                      `json:"mtu"`
 	Links       []map[string]interface{} `json:"links"`
 }
 
@@ -90,12 +91,13 @@ func checkLinkExists(linkName string, netNsHandle *netlink.Handle) (netlink.Link
 }
 
 // configure the bonded link & add it using the netNsHandle context to add it to the required namespace. return a bondLinkObj pointer & error
-func createBondedLink(bondName string, bondMode string, bondMiimon string, netNsHandle *netlink.Handle) (*netlink.Bond, error) {
+func createBondedLink(bondName string, bondMode string, bondMiimon string, bondMtu int, netNsHandle *netlink.Handle) (*netlink.Bond, error) {
 	var err error
 
 	bondLinkObj := netlink.NewLinkBond(netlink.NewLinkAttrs())
 	bondModeObj := netlink.StringToBondMode(bondMode)
 	bondLinkObj.Attrs().Name = bondName
+	bondLinkObj.Attrs().MTU = bondMtu
 	bondLinkObj.Mode = bondModeObj
 	bondLinkObj.Miimon, err = strconv.Atoi(bondMiimon)
 
@@ -237,7 +239,7 @@ func createBond(bondConf *bondingConfig, nspath string, ns ns.NetNS) (*current.I
 		return nil, fmt.Errorf("Failed to retrieve link objects from configuration file (%+v), error: %+v", bondConf, err)
 	}
 
-	bondLinkObj, err := createBondedLink(bondConf.Name, bondConf.Mode, bondConf.Miimon, netNsHandle)
+	bondLinkObj, err := createBondedLink(bondConf.Name, bondConf.Mode, bondConf.Miimon, bondConf.Mtu, netNsHandle)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create bonded link (%+v), error: %+v", bondConf.Name, err)
 	}
