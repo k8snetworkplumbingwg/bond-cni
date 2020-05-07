@@ -137,7 +137,8 @@ metadata:
 spec:
   config: '{
   "type": "sriov",
-  "name": "sriov-network"
+  "name": "sriov-network",
+  "spoofchk":"off"
 }'
 ```
 
@@ -152,7 +153,8 @@ metadata:
 spec:
   config: '{
   "type": "sriov",
-  "name": "sriov-network"
+  "name": "sriov-network",
+  "spoofchk":"off"
 }'
 ```
 2) Deploy Network Attach Definition for Bond CNI:
