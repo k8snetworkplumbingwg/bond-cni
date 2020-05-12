@@ -9,18 +9,18 @@
 
 ## Build
 
-It is recommended that Bond CNI be built with Go 1.12+ as dependencies are managed using go mod.
+It is recommended that Bond CNI be built with Go 1.12+ with dependencies managed using Go modules.
 
 - Build the source code to binary:
 
 ```
-#make build-bin
+make build-bin
 ```
 
 - Copy the binary to the CNI folder for the testing:
 
 ```
-# cp ./bin/bond /opt/cni/bin/
+cp ./bin/bond /opt/cni/bin/
 ```
 
 The binary should be placed at /opt/cni/bin on all nodes on which bonding will take place. That is all nodes to which a container with a bonded interface can be deployed.
@@ -31,6 +31,7 @@ The binary should be placed at /opt/cni/bin on all nodes on which bonding will t
 - type (string, required): &quot;bond&quot;
 - ifname (string, optional): name of the bond interface
 - miimon (int, required): specifies the arp link monitoring frequency in milliseconds
+- failOverMac (int, optional): specifies the failOverMac setting for the bond. Should be set to 1 for active-backup bond modes. Default is 0.
 - linksInContainer(boolean, optional): specifies if slave links are in container to start. Default is false i.e. look for interfaces on host before bonding.
 - links (dictionary, required): master interface names
 - ipam (dictionary, required): IPAM configuration to be used for this network
@@ -49,6 +50,7 @@ Given the following network configuration:
 		"type": "bond",
 		"mode": "active-backup",
 		"miimon": "100",
+                "failOverMac": 1,
 		"links": [
             {
 				"name": "ens3f2"
@@ -170,6 +172,7 @@ spec:
   "name": "bond-net1",
   "ifname": "bond0",
   "mode": "active-backup",
+  "failOverMac": 1,
   "linksInContainer": true,
   "miimon": "100",
   "links": [
@@ -257,8 +260,3 @@ Will result in  output like:
 ```
 
 We have three new interfaces added to our pod - net1 and net2 are SRIOV interfaces while bond0 is the bond over the two of them. Net1 and Net2 don't require IP addresses - and this can be changed in their CRD.
-
-## Known issues
-
-### Fail over MAC in active backup mode
-If a bond is configured in active-backup mode the bond interface will try to change the VF mac address in order to mirror the MAC of the VFs. The pod may not have permission to change the MAC address, which would require a privileged pod. This type of configuration is not currently covered by the Bond CNI.
