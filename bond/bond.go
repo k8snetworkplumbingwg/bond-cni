@@ -39,6 +39,7 @@ type bondingConfig struct {
 	Name        string                   `json:"ifname"`
 	Mode        string                   `json:"mode"`
 	LinksContNs bool                     `json:"linksInContainer"`
+	FailOverMac int                      `json:"failOverMac"`
 	Miimon      string                   `json:"miimon"`
 	Links       []map[string]interface{} `json:"links"`
 }
@@ -90,14 +91,14 @@ func checkLinkExists(linkName string, netNsHandle *netlink.Handle) (netlink.Link
 }
 
 // configure the bonded link & add it using the netNsHandle context to add it to the required namespace. return a bondLinkObj pointer & error
-func createBondedLink(bondName string, bondMode string, bondMiimon string, netNsHandle *netlink.Handle) (*netlink.Bond, error) {
+func createBondedLink(bondName string, bondMode string, bondMiimon string, failOverMac int, netNsHandle *netlink.Handle) (*netlink.Bond, error) {
 	var err error
-
 	bondLinkObj := netlink.NewLinkBond(netlink.NewLinkAttrs())
 	bondModeObj := netlink.StringToBondMode(bondMode)
 	bondLinkObj.Attrs().Name = bondName
 	bondLinkObj.Mode = bondModeObj
 	bondLinkObj.Miimon, err = strconv.Atoi(bondMiimon)
+	bondLinkObj.FailOverMac = netlink.BondFailOverMac(failOverMac)
 
 	if err != nil {
 		return nil, fmt.Errorf("Failed to convert bondMiimon value (%+v) to an int, error: %+v", bondMiimon, err)
@@ -236,8 +237,10 @@ func createBond(bondConf *bondingConfig, nspath string, ns ns.NetNS) (*current.I
 	if err != nil {
 		return nil, fmt.Errorf("Failed to retrieve link objects from configuration file (%+v), error: %+v", bondConf, err)
 	}
-
-	bondLinkObj, err := createBondedLink(bondConf.Name, bondConf.Mode, bondConf.Miimon, netNsHandle)
+	if bondConf.FailOverMac< 0 || bondConf.FailOverMac > 2 {
+		return nil, fmt.Errorf("FailOverMac mode should be 0, 1 or 2 actual: %+v", bondConf.FailOverMac)
+	}
+	bondLinkObj, err := createBondedLink(bondConf.Name, bondConf.Mode, bondConf.Miimon, bondConf.FailOverMac, netNsHandle)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create bonded link (%+v), error: %+v", bondConf.Name, err)
 	}
@@ -384,7 +387,10 @@ func cmdDel(args *skel.CmdArgs) error {
 
 	return err
 }
+func cmdCheck(args *skel.CmdArgs) error {
+	return nil
+}
 
 func main() {
-	skel.PluginMain(cmdAdd, cmdDel, version.All)
+	skel.PluginMain(cmdAdd, cmdCheck, cmdDel, version.All, "")
 }
