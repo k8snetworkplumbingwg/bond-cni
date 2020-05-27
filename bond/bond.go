@@ -34,11 +34,18 @@ import (
 	"github.com/vishvananda/netns"
 )
 
+var (
+	maxMTU = 9216
+	minMTU = 68
+	stdMTU = 1500
+)
+
 type bondingConfig struct {
 	types.NetConf
 	Name        string                   `json:"ifname"`
 	Mode        string                   `json:"mode"`
 	LinksContNs bool                     `json:"linksInContainer"`
+	FailOverMac int                      `json:"failOverMac"`
 	Miimon      string                   `json:"miimon"`
 	Mtu         int                      `json:"mtu"`
 	Links       []map[string]interface{} `json:"links"`
@@ -91,18 +98,18 @@ func checkLinkExists(linkName string, netNsHandle *netlink.Handle) (netlink.Link
 }
 
 // configure the bonded link & add it using the netNsHandle context to add it to the required namespace. return a bondLinkObj pointer & error
-func createBondedLink(bondName string, bondMode string, bondMiimon string, bondMtu int, netNsHandle *netlink.Handle) (*netlink.Bond, error) {
+func createBondedLink(name string, bondMode string, miimon string, failOverMac int, mtu int, netNsHandle *netlink.Handle) (*netlink.Bond, error) {
 	var err error
-
 	bondLinkObj := netlink.NewLinkBond(netlink.NewLinkAttrs())
 	bondModeObj := netlink.StringToBondMode(bondMode)
-	bondLinkObj.Attrs().Name = bondName
-	bondLinkObj.Attrs().MTU = bondMtu
+	bondLinkObj.Attrs().Name = name
+	bondLinkObj.Attrs().MTU = mtu
 	bondLinkObj.Mode = bondModeObj
-	bondLinkObj.Miimon, err = strconv.Atoi(bondMiimon)
+	bondLinkObj.Miimon, err = strconv.Atoi(miimon)
+	bondLinkObj.FailOverMac = netlink.BondFailOverMac(failOverMac)
 
 	if err != nil {
-		return nil, fmt.Errorf("Failed to convert bondMiimon value (%+v) to an int, error: %+v", bondMiimon, err)
+		return nil, fmt.Errorf("Failed to convert bondMiimon value (%+v) to an int, error: %+v", miimon, err)
 	}
 
 	err = netNsHandle.LinkAdd(bondLinkObj)
@@ -238,15 +245,20 @@ func createBond(bondConf *bondingConfig, nspath string, ns ns.NetNS) (*current.I
 	if err != nil {
 		return nil, fmt.Errorf("Failed to retrieve link objects from configuration file (%+v), error: %+v", bondConf, err)
 	}
-
-	bondLinkObj, err := createBondedLink(bondConf.Name, bondConf.Mode, bondConf.Miimon, bondConf.Mtu, netNsHandle)
+	if bondConf.FailOverMac < 0 || bondConf.FailOverMac > 2 {
+		return nil, fmt.Errorf("FailOverMac mode should be 0, 1 or 2 actual: %+v", bondConf.FailOverMac)
+	}
+	// check if MTU is set outside normal bounds
+	if bondConf.Mtu < minMTU || bondConf.Mtu > maxMTU {
+		return nil, fmt.Errorf("MTU parameter should be between 68, 9216. Requested value: %v", bondConf.Mtu)
+	}
+	bondLinkObj, err := createBondedLink(bondConf.Name, bondConf.Mode, bondConf.Miimon, bondConf.FailOverMac, bondConf.Mtu, netNsHandle)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create bonded link (%+v), error: %+v", bondConf.Name, err)
 	}
-
 	err = attachLinksToBond(bondLinkObj, linkObjectsToBond, netNsHandle)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to attached links to bond, error: %+v", err)
+		return nil, fmt.Errorf("Failed to attach links to bond, error: %+v", err)
 	}
 
 	bond.Name = bondConf.Name
@@ -363,14 +375,20 @@ func cmdDel(args *skel.CmdArgs) error {
 	if err != nil {
 		return fmt.Errorf("Failed to find bonded link (%+v), error: %+v", bondConf.Name, err)
 	}
-
+	//reset mtu value of bond to a "standard" value of 1500 which also resets value of each slave link
+	if linkObjToDel.Attrs().MTU != stdMTU {
+		err = netNsHandle.LinkSetMTU(linkObjToDel, stdMTU)
+		if err != nil {
+			return fmt.Errorf("Failed to reset MTU value to default")
+		}
+	}
 	err = netNsHandle.LinkSetDown(linkObjToDel)
 	if err != nil {
 		return fmt.Errorf("Failed to set bonded link: %+v DOWN, error: %+v", linkObjToDel.Attrs().Name, err)
 	}
 
 	if err = deattachLinksFromBond(linkObjectsToDeattach, netNsHandle); err != nil {
-		return fmt.Errorf("Failed to deattached links from bond, error: %+v", err)
+		return fmt.Errorf("Failed to detatch links from bond, error: %+v", err)
 	}
 
 	err = netNsHandle.LinkDel(linkObjToDel)
@@ -386,7 +404,10 @@ func cmdDel(args *skel.CmdArgs) error {
 
 	return err
 }
+func cmdCheck(args *skel.CmdArgs) error {
+	return nil
+}
 
 func main() {
-	skel.PluginMain(cmdAdd, cmdDel, version.All)
+	skel.PluginMain(cmdAdd, cmdCheck, cmdDel, version.All, "")
 }
