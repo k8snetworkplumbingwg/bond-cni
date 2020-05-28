@@ -249,7 +249,9 @@ func createBond(bondConf *bondingConfig, nspath string, ns ns.NetNS) (*current.I
 		return nil, fmt.Errorf("FailOverMac mode should be 0, 1 or 2 actual: %+v", bondConf.FailOverMac)
 	}
 	// check if MTU is set outside normal bounds
-	if bondConf.Mtu < minMTU || bondConf.Mtu > maxMTU {
+	// 0 value is used to check if Mtu is set in config
+	//TODO: change mtu and other int types to *int to get rid of bad assumption about 0 value.
+	if bondConf.Mtu != 0 && ( bondConf.Mtu < minMTU || bondConf.Mtu > maxMTU) {
 		return nil, fmt.Errorf("MTU parameter should be between 68, 9216. Requested value: %v", bondConf.Mtu)
 	}
 	bondLinkObj, err := createBondedLink(bondConf.Name, bondConf.Mode, bondConf.Miimon, bondConf.FailOverMac, bondConf.Mtu, netNsHandle)
