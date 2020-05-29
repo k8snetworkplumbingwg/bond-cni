@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-pod
+  annotations:
+    k8s.v1.cni.cncf.io/networks: '[
+{"name": "sriov-backup-bondnet",
+"interface": "net1"
+},
+{"name": "sriov-backup-bondnet",
+"interface": "net2"
+},
+{"name": "bond-lacp",
+"interface": "bond0"
+}]'
+spec:  
+  restartPolicy: Never
+  hostPID: true
+  hostIPC: true
+  containers:
+  - name: bond-test
+    image: alpine:latest
+    command:
+      - /bin/sh
+      - "-c"
+      - "sleep 60m"
+    imagePullPolicy: IfNotPresent
+    resources:
+      requests:
+        intel.com/intel_sriov_netdevice: '2'
+      limits:
+        intel.com/intel_sriov_netdevice: '2'

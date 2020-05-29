@@ -40,6 +40,8 @@ type bondingConfig struct {
 	Mode        string                   `json:"mode"`
 	LinksContNs bool                     `json:"linksInContainer"`
 	FailOverMac int                      `json:"failOverMac"`
+        XmitHashPolicy string		     `json: xmitHashPolicy`
+	LacpRate string                      `json: lacpRate`
 	Miimon      string                   `json:"miimon"`
 	Links       []map[string]interface{} `json:"links"`
 }
@@ -91,7 +93,7 @@ func checkLinkExists(linkName string, netNsHandle *netlink.Handle) (netlink.Link
 }
 
 // configure the bonded link & add it using the netNsHandle context to add it to the required namespace. return a bondLinkObj pointer & error
-func createBondedLink(bondName string, bondMode string, bondMiimon string, failOverMac int, netNsHandle *netlink.Handle) (*netlink.Bond, error) {
+func createBondedLink(bondName string, bondMode string, xmitHashPolicy string, lacpRate string, bondMiimon string, failOverMac int, netNsHandle *netlink.Handle) (*netlink.Bond, error) {
 	var err error
 	bondLinkObj := netlink.NewLinkBond(netlink.NewLinkAttrs())
 	bondModeObj := netlink.StringToBondMode(bondMode)
@@ -99,6 +101,8 @@ func createBondedLink(bondName string, bondMode string, bondMiimon string, failO
 	bondLinkObj.Mode = bondModeObj
 	bondLinkObj.Miimon, err = strconv.Atoi(bondMiimon)
 	bondLinkObj.FailOverMac = netlink.BondFailOverMac(failOverMac)
+	bondLinkObj.XmitHashPolicy = netlink.StringToBondXmitHashPolicy(xmitHashPolicy)
+	bondLinkObj.LacpRate = netlink.StringToBondLacpRate(lacpRate)
 
 	if err != nil {
 		return nil, fmt.Errorf("Failed to convert bondMiimon value (%+v) to an int, error: %+v", bondMiimon, err)
@@ -240,7 +244,7 @@ func createBond(bondConf *bondingConfig, nspath string, ns ns.NetNS) (*current.I
 	if bondConf.FailOverMac< 0 || bondConf.FailOverMac > 2 {
 		return nil, fmt.Errorf("FailOverMac mode should be 0, 1 or 2 actual: %+v", bondConf.FailOverMac)
 	}
-	bondLinkObj, err := createBondedLink(bondConf.Name, bondConf.Mode, bondConf.Miimon, bondConf.FailOverMac, netNsHandle)
+	bondLinkObj, err := createBondedLink(bondConf.Name, bondConf.Mode, bondConf.XmitHashPolicy, bondConf.LacpRate ,bondConf.Miimon, bondConf.FailOverMac, netNsHandle)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create bonded link (%+v), error: %+v", bondConf.Name, err)
 	}
