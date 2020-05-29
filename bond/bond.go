@@ -391,10 +391,6 @@ func cmdCheck(args *skel.CmdArgs) error {
 	return nil
 }
 
-func cmdCheck(args *skel.CmdArgs) error {
-	return nil
-}
-
 func main() {
 	skel.PluginMain(cmdAdd, cmdCheck, cmdDel, version.All, "")
 }
