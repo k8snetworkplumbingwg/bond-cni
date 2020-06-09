@@ -24,6 +24,7 @@ import (
 
 	"strconv"
 
+
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
 	"github.com/containernetworking/cni/pkg/types/current"
@@ -44,6 +45,10 @@ type bondingConfig struct {
 	Links       []map[string]interface{} `json:"links"`
 }
 
+var (
+	bondCni = "bond"
+)
+
 func init() {
 	// this ensures that main runs only on main thread (thread group leader).
 	// since namespace ops (unshare, setns) are done for a single thread, we
@@ -57,15 +62,22 @@ func loadConfigFile(bytes []byte) (*bondingConfig, string, error) {
 	if err := json.Unmarshal(bytes, bondConf); err != nil {
 		return nil, "", fmt.Errorf("Failed to load configuration file, error = %+v", err)
 	}
+        if bondConf.IPAM.Type == bondCni{
+                return nil, "", fmt.Errorf("Bond is not a suitable IPAM type")
+        }
 	return bondConf, bondConf.CNIVersion, nil
 }
 
 // retrieve the link names from the bondConf & check they exist. return an array of linkObjectsToBond & error
 func getLinkObjectsFromConfig(bondConf *bondingConfig, netNsHandle *netlink.Handle) ([]netlink.Link, error) {
 	linkNames := []string{}
-	for _, linkName := range bondConf.Links {
-		linkNames = append(linkNames, linkName["name"].(string))
-	}
+        for _, linkName := range bondConf.Links {
+                s , ok := linkName["name"].(string)
+                if !ok {
+                        return nil, fmt.Errorf("failed to find link name")
+                }
+                linkNames = append(linkNames, s)
+        }
 	linkObjectsToBond := []netlink.Link{}
 	if len(linkNames) > 1 && len(linkNames) <= 2 { // currently only supporting two links to one bond
 		for _, linkName := range linkNames {
@@ -161,9 +173,13 @@ func setLinksinNetNs(bondConf *bondingConfig, nspath string, releaseLinks bool) 
 	var err error
 
 	linkNames := []string{}
-	for _, linkName := range bondConf.Links {
-		linkNames = append(linkNames, linkName["name"].(string))
-	}
+        for _, linkName := range bondConf.Links {
+                s , ok := linkName["name"].(string)
+                if !ok {
+                        return fmt.Errorf("failed to find link name")
+                }
+                linkNames = append(linkNames, s)
+        }
 
 	if netNs, err = ns.GetNS(nspath); err != nil {
 		return fmt.Errorf("failed to open netns %q: %v", nspath, err)
