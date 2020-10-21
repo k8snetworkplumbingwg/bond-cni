@@ -414,6 +414,7 @@ func logAndError (msg string) error {
 	klog.Flush()
 	return fmt.Errorf(msg)
 }
+
 func cmdCheck(args *skel.CmdArgs) error {
 	return nil
 }
