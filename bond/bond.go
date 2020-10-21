@@ -18,7 +18,7 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
+	"flag"
 	"fmt"
 	"runtime"
 
@@ -32,6 +32,7 @@ import (
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
+	"k8s.io/klog/v2"
 )
 
 type bondingConfig struct {
@@ -125,6 +126,7 @@ func attachLinksToBond(bondLinkObj *netlink.Bond, linkObjectsToBond []netlink.Li
 		err = netNsHandle.LinkSetMasterByIndex(linkObject, bondLinkIndex)
 		if err != nil {
 			return fmt.Errorf("Failed to set link: %+v MASTER, master index used: %+v, error: %+v", linkObject.Attrs().Name, bondLinkIndex, err)
+
 		}
 		err = netNsHandle.LinkSetUp(linkObject)
 		if err != nil {
@@ -199,12 +201,13 @@ func setLinksinNetNs(bondConf *bondingConfig, nspath string, releaseLinks bool) 
 			} else {
 				if err = netlink.LinkSetNsFd(link, int(netNs.Fd())); err != nil {
 					return fmt.Errorf("failed to move link interface to container netns %q: %v", linkName, err)
+
 				}
 			}
 
 		}
 	} else {
-		return fmt.Errorf("Bonding requires exactly two links, we have %+v", len(linkNames))
+			return fmt.Errorf("Bonding requires exactly two links, we have %+v", len(linkNames))
 	}
 
 	return nil
@@ -236,6 +239,7 @@ func createBond(bondConf *bondingConfig, nspath string, ns ns.NetNS) (*current.I
 	linkObjectsToBond, err := getLinkObjectsFromConfig(bondConf, netNsHandle)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to retrieve link objects from configuration file (%+v), error: %+v", bondConf, err)
+
 	}
 	if bondConf.FailOverMac< 0 || bondConf.FailOverMac > 2 {
 		return nil, fmt.Errorf("FailOverMac mode should be 0, 1 or 2 actual: %+v", bondConf.FailOverMac)
@@ -269,12 +273,14 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 	bondConf, cniVersion, err := loadConfigFile(args.StdinData)
 	if err != nil {
-		return err
+		errorMessage := fmt.Sprintf("%v", err)
+		return logAndError(errorMessage)
 	}
 
 	netns, err := ns.GetNS(args.Netns)
 	if err != nil {
-		return fmt.Errorf("failed to open netns %q: %v", netns, err)
+		errorMessage := fmt.Sprintf("failed to open netns %q: %v", netns, err)
+		return logAndError(errorMessage)
 	}
 	defer netns.Close()
 
@@ -284,22 +290,26 @@ func cmdAdd(args *skel.CmdArgs) error {
 
 	bondInterface, err := createBond(bondConf, args.Netns, netns)
 	if err != nil {
-		return err
+		errorMessage := fmt.Sprintf("%v", err)
+		return logAndError(errorMessage)
 	}
 
 	// run the IPAM plugin and get back the config to apply
 	r, err := ipam.ExecAdd(bondConf.IPAM.Type, args.StdinData)
 	if err != nil {
-		return err
+		errorMessage := fmt.Sprintf("%v", err)
+		return logAndError(errorMessage)
 	}
 	// Convert whatever the IPAM result was into the current Result type
 	result, err := current.NewResultFromResult(r)
 	if err != nil {
-		return err
+		errorMessage := fmt.Sprintf("%v", err)
+		return logAndError(errorMessage)
 	}
 
 	if len(result.IPs) == 0 {
-		return errors.New("IPAM plugin returned missing IP config")
+		errorMessage := fmt.Sprintf("IPAM plugin returned missing IP config")
+		return logAndError(errorMessage)
 	}
 	for _, ipc := range result.IPs {
 		// All addresses belong to the vlan interface
@@ -312,7 +322,8 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return ipam.ConfigureIface(bondConf.Name, result)
 	})
 	if err != nil {
-		return err
+		errorMessage := fmt.Sprintf("%v", err)
+		return logAndError(errorMessage)
 	}
 
 	result.DNS = bondConf.DNS
@@ -326,12 +337,14 @@ func cmdDel(args *skel.CmdArgs) error {
 
 	bondConf, _, err := loadConfigFile(args.StdinData)
 	if err != nil {
-		return err
+		errorMessage := fmt.Sprintf("%v", err)
+		return logAndError(errorMessage)
 	}
 
 	err = ipam.ExecDel(bondConf.IPAM.Type, args.StdinData)
 	if err != nil {
-		return err
+		errorMessage := fmt.Sprintf("%v", err)
+		return logAndError(errorMessage)
 	}
 
 	if args.Netns == "" {
@@ -341,13 +354,15 @@ func cmdDel(args *skel.CmdArgs) error {
 	// get the namespace from the CNI_NETNS environment variable
 	netNs, err := netns.GetFromPath(args.Netns)
 	if err != nil {
-		return fmt.Errorf("Failed to retrieve netNs from path (%+v), error: %+v", args.Netns, err)
+		errorMessage := fmt.Sprintf("Failed to retrieve netNs from path (%+v), error: %+v", args.Netns, err)
+		return logAndError(errorMessage)
 	}
 	defer netNs.Close()
 	// get a handle for the namespace above, this handle will be used to interact with existing links and add a new one
 	netNsHandle, err := netlink.NewHandleAt(netNs)
 	if err != nil {
-		return fmt.Errorf("Failed to create a new handle at netNs (%+v), error: %+v", netNs, err)
+		errorMessage := fmt.Sprintf("Failed to create a new handle at netNs (%+v), error: %+v", netNs, err)
+		return logAndError(errorMessage)
 	}
 	defer netNsHandle.Delete()
 
@@ -357,40 +372,63 @@ func cmdDel(args *skel.CmdArgs) error {
 
 	linkObjectsToDeattach, err := getLinkObjectsFromConfig(bondConf, netNsHandle)
 	if err != nil {
-		return fmt.Errorf("Failed to retrieve link objects from configuration file (%+v), error: %+v", bondConf, err)
+		errorMessage := fmt.Sprintf("Failed to retrieve link objects from configuration file (%+v), error: %+v", bondConf, err)
+		return logAndError(errorMessage)
 	}
 
 	linkObjToDel, err := checkLinkExists(bondConf.Name, netNsHandle)
 	if err != nil {
-		return fmt.Errorf("Failed to find bonded link (%+v), error: %+v", bondConf.Name, err)
+		errorMessage := fmt.Sprintf("Failed to find bonded link (%+v), error: %+v", bondConf.Name, err)
+		return logAndError(errorMessage)
 	}
 
 	err = netNsHandle.LinkSetDown(linkObjToDel)
 	if err != nil {
-		return fmt.Errorf("Failed to set bonded link: %+v DOWN, error: %+v", linkObjToDel.Attrs().Name, err)
+		errorMessage := fmt.Sprintf("Failed to set bonded link: %+v DOWN, error: %+v", linkObjToDel.Attrs().Name, err)
+		return logAndError(errorMessage)
 	}
 
 	if err = deattachLinksFromBond(linkObjectsToDeattach, netNsHandle); err != nil {
-		return fmt.Errorf("Failed to deattached links from bond, error: %+v", err)
+		errorMessage := fmt.Sprintf("Failed to deattached links from bond, error: %+v", err)
+		return logAndError(errorMessage)
 	}
 
 	err = netNsHandle.LinkDel(linkObjToDel)
 	if err != nil {
-		return fmt.Errorf("Failed to delete bonded link (%+v), error: %+v", linkObjToDel.Attrs().Name, err)
+		errorMessage := fmt.Sprintf("Failed to delete bonded link (%+v), error: %+v", linkObjToDel.Attrs().Name, err)
+		return logAndError(errorMessage)
 	}
 
 	if bondConf.LinksContNs != true {
 		if err := setLinksinNetNs(bondConf, args.Netns, true); err != nil {
-			return fmt.Errorf("Failed set links (%+v) in host network namespace, error: %+v", bondConf.Links, err)
+			errorMessage := fmt.Sprintf("Failed set links (%+v) in host network namespace, error: %+v", bondConf.Links, err)
+			return logAndError(errorMessage)
 		}
 	}
 
 	return err
+}
+
+func logAndError (msg string) error {
+	klog.V(2).Info(msg)
+	klog.Flush()
+	return fmt.Errorf(msg)
 }
 func cmdCheck(args *skel.CmdArgs) error {
 	return nil
 }
 
 func main() {
+
+	//These two lines are needed to parse flags an produce logs as configured
+	klog.InitFlags(nil)
+	flag.Set("logtostderr", "false")
+	flag.Set("log_file", "logs.log")
+	flag.Parse()
+	//This line produces an info level log
+	klog.Info("still trying after all this")
+	//This line gates a log based on a specified log level
+	klog.V(2).Info("still a problem")
+
 	skel.PluginMain(cmdAdd, cmdCheck, cmdDel, version.All, "")
 }
