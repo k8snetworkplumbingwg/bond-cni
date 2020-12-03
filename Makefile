@@ -11,8 +11,9 @@ BINARY_NAME=./bin/bond
 # example:
 #  before running make set vars like so
 #  export DOCKER_REPO=my_repo
-DOCKER_REPO?=jdambly
+IMAGE_REPO?=jdambly
 IMAGE_VERSION?=v0.1
+IMAGE_NAME?=bond-cni
 
 help: ## Show available Makefile targets
 	@awk '\
@@ -41,7 +42,7 @@ deps: ##  go mod <deps>
 	go mod vendor
 
 docker-build:
-	docker run --rm -it -v "$(GOPATH)":/go -w /go/src/bitbucket.org/rsohlich/makepost golang:latest go build -o "$(BINARY_UNIX)" -v
+	docker build -t $(IMAGE_REPO)/$(IMAGE_NAME):($IMAGE_VERSION) .
 
 gofmt:
 	@echo "Running gofmt"
