@@ -41,9 +41,9 @@ deps: ##  go mod <deps>
 	go mod tidy && \
 	go mod vendor
 
-docker-build:
+docker-build: ## build using docker
 	docker build -t $(IMAGE_REPO)/$(IMAGE_NAME):($IMAGE_VERSION) .
 
-gofmt:
+gofmt: ## run go format
 	@echo "Running gofmt"
 	gofmt -s -l `find . -path ./vendor -prune -o -type f -name '*.go' -print`

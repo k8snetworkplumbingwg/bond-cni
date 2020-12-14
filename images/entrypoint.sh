@@ -59,5 +59,10 @@ if cp -f "$BON_BIN_FILE" "$CNI_BIN_DIR"; then
     echo "Bond CNI installed Success!"
     exit 0
 else
-    echo "Clound not copy file"
+    echo "Could not copy file"
     exit 1
+fi
+
+while true; do
+  sleep 3600
+done
