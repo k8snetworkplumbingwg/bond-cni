@@ -78,7 +78,7 @@ func getLinkObjectsFromConfig(bondConf *bondingConfig, netNsHandle *netlink.Hand
 		linkNames = append(linkNames, s)
 	}
 	linkObjectsToBond := []netlink.Link{}
-	if len(linkNames) > 1 && len(linkNames) <= 2 { // currently only supporting two links to one bond
+	if len(linkNames) >= 2 { // currently supporting two or more links to one bond
 		for _, linkName := range linkNames {
 			linkObject, err := checkLinkExists(linkName, netNsHandle)
 			if err != nil {
@@ -87,7 +87,7 @@ func getLinkObjectsFromConfig(bondConf *bondingConfig, netNsHandle *netlink.Hand
 			linkObjectsToBond = append(linkObjectsToBond, linkObject)
 		}
 	} else {
-		return nil, fmt.Errorf("Bonding requires exactly two links, we have %+v", len(linkNames))
+		return nil, fmt.Errorf("Bonding requires at least two links, we have %+v", len(linkNames))
 	}
 	return linkObjectsToBond, nil
 }
@@ -194,7 +194,7 @@ func setLinksinNetNs(bondConf *bondingConfig, nspath string, releaseLinks bool) 
 		}
 	}
 
-	if len(linkNames) > 1 && len(linkNames) <= 2 { // currently only supporting two links to one bond
+	if len(linkNames) >= 2 { // currently supporting two or more links to one bond
 		for _, linkName := range linkNames {
 			// get interface link in the network namespace
 			link, err := netlink.LinkByName(linkName)
@@ -219,7 +219,7 @@ func setLinksinNetNs(bondConf *bondingConfig, nspath string, releaseLinks bool) 
 
 		}
 	} else {
-		return fmt.Errorf("Bonding requires exactly two links, we have %+v", len(linkNames))
+		return fmt.Errorf("Bonding requires at least two links, we have %+v", len(linkNames))
 	}
 
 	return nil
