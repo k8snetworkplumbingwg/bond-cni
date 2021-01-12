@@ -24,7 +24,6 @@ import (
 
 	"strconv"
 
-
 	"github.com/containernetworking/cni/pkg/skel"
 	"github.com/containernetworking/cni/pkg/types"
 	"github.com/containernetworking/cni/pkg/types/current"
@@ -62,22 +61,22 @@ func loadConfigFile(bytes []byte) (*bondingConfig, string, error) {
 	if err := json.Unmarshal(bytes, bondConf); err != nil {
 		return nil, "", fmt.Errorf("Failed to load configuration file, error = %+v", err)
 	}
-        if bondConf.IPAM.Type == bondCni{
-                return nil, "", fmt.Errorf("Bond is not a suitable IPAM type")
-        }
+	if bondConf.IPAM.Type == bondCni {
+		return nil, "", fmt.Errorf("Bond is not a suitable IPAM type")
+	}
 	return bondConf, bondConf.CNIVersion, nil
 }
 
 // retrieve the link names from the bondConf & check they exist. return an array of linkObjectsToBond & error
 func getLinkObjectsFromConfig(bondConf *bondingConfig, netNsHandle *netlink.Handle) ([]netlink.Link, error) {
 	linkNames := []string{}
-        for _, linkName := range bondConf.Links {
-                s , ok := linkName["name"].(string)
-                if !ok {
-                        return nil, fmt.Errorf("failed to find link name")
-                }
-                linkNames = append(linkNames, s)
-        }
+	for _, linkName := range bondConf.Links {
+		s, ok := linkName["name"].(string)
+		if !ok {
+			return nil, fmt.Errorf("failed to find link name")
+		}
+		linkNames = append(linkNames, s)
+	}
 	linkObjectsToBond := []netlink.Link{}
 	if len(linkNames) > 1 && len(linkNames) <= 2 { // currently only supporting two links to one bond
 		for _, linkName := range linkNames {
@@ -173,13 +172,13 @@ func setLinksinNetNs(bondConf *bondingConfig, nspath string, releaseLinks bool) 
 	var err error
 
 	linkNames := []string{}
-        for _, linkName := range bondConf.Links {
-                s , ok := linkName["name"].(string)
-                if !ok {
-                        return fmt.Errorf("failed to find link name")
-                }
-                linkNames = append(linkNames, s)
-        }
+	for _, linkName := range bondConf.Links {
+		s, ok := linkName["name"].(string)
+		if !ok {
+			return fmt.Errorf("failed to find link name")
+		}
+		linkNames = append(linkNames, s)
+	}
 
 	if netNs, err = ns.GetNS(nspath); err != nil {
 		return fmt.Errorf("failed to open netns %q: %v", nspath, err)
@@ -253,7 +252,7 @@ func createBond(bondConf *bondingConfig, nspath string, ns ns.NetNS) (*current.I
 	if err != nil {
 		return nil, fmt.Errorf("Failed to retrieve link objects from configuration file (%+v), error: %+v", bondConf, err)
 	}
-	if bondConf.FailOverMac< 0 || bondConf.FailOverMac > 2 {
+	if bondConf.FailOverMac < 0 || bondConf.FailOverMac > 2 {
 		return nil, fmt.Errorf("FailOverMac mode should be 0, 1 or 2 actual: %+v", bondConf.FailOverMac)
 	}
 	bondLinkObj, err := createBondedLink(bondConf.Name, bondConf.Mode, bondConf.Miimon, bondConf.FailOverMac, netNsHandle)
@@ -303,35 +302,43 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return err
 	}
 
+	result := &current.Result{
+		CNIVersion: cniVersion,
+	}
 	// run the IPAM plugin and get back the config to apply
-	r, err := ipam.ExecAdd(bondConf.IPAM.Type, args.StdinData)
-	if err != nil {
-		return err
-	}
-	// Convert whatever the IPAM result was into the current Result type
-	result, err := current.NewResultFromResult(r)
-	if err != nil {
-		return err
-	}
+	if bondConf.IPAM.Type != "" {
+		r, err := ipam.ExecAdd(bondConf.IPAM.Type, args.StdinData)
+		if err != nil {
+			return err
+		}
+		// Convert whatever the IPAM result was into the current Result type
+		result, err := current.NewResultFromResult(r)
+		if err != nil {
+			return err
+		}
 
-	if len(result.IPs) == 0 {
-		return errors.New("IPAM plugin returned missing IP config")
-	}
-	for _, ipc := range result.IPs {
-		// All addresses belong to the vlan interface
-		ipc.Interface = current.Int(0)
+		if len(result.IPs) == 0 {
+			return errors.New("IPAM plugin returned missing IP config")
+		}
+		for _, ipc := range result.IPs {
+			// All addresses belong to the vlan interface
+			ipc.Interface = current.Int(0)
+		}
+
+		result.Interfaces = []*current.Interface{bondInterface}
+
+		err = netns.Do(func(_ ns.NetNS) error {
+			return ipam.ConfigureIface(bondConf.Name, result)
+		})
+		if err != nil {
+			return err
+		}
+
+		result.DNS = bondConf.DNS
+
 	}
 
 	result.Interfaces = []*current.Interface{bondInterface}
-
-	err = netns.Do(func(_ ns.NetNS) error {
-		return ipam.ConfigureIface(bondConf.Name, result)
-	})
-	if err != nil {
-		return err
-	}
-
-	result.DNS = bondConf.DNS
 
 	return types.PrintResult(result, cniVersion)
 
@@ -345,9 +352,11 @@ func cmdDel(args *skel.CmdArgs) error {
 		return err
 	}
 
-	err = ipam.ExecDel(bondConf.IPAM.Type, args.StdinData)
-	if err != nil {
-		return err
+	if bondConf.IPAM.Type != "" {
+		err = ipam.ExecDel(bondConf.IPAM.Type, args.StdinData)
+		if err != nil {
+			return err
+		}
 	}
 
 	if args.Netns == "" {
