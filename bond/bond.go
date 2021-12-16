@@ -17,6 +17,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -42,6 +43,7 @@ type bondingConfig struct {
 	FailOverMac int                      `json:"failOverMac"`
 	Miimon      string                   `json:"miimon"`
 	Links       []map[string]interface{} `json:"links"`
+	MTU         int                      `json:"mtu"`
 }
 
 var (
@@ -102,18 +104,20 @@ func checkLinkExists(linkName string, netNsHandle *netlink.Handle) (netlink.Link
 }
 
 // configure the bonded link & add it using the netNsHandle context to add it to the required namespace. return a bondLinkObj pointer & error
-func createBondedLink(bondName string, bondMode string, bondMiimon string, failOverMac int, netNsHandle *netlink.Handle) (*netlink.Bond, error) {
+func createBondedLink(bondName string, bondMode string, bondMiimon string, bondMTU int, failOverMac int, netNsHandle *netlink.Handle) (*netlink.Bond, error) {
 	var err error
 	bondLinkObj := netlink.NewLinkBond(netlink.NewLinkAttrs())
 	bondModeObj := netlink.StringToBondMode(bondMode)
 	bondLinkObj.Attrs().Name = bondName
 	bondLinkObj.Mode = bondModeObj
 	bondLinkObj.Miimon, err = strconv.Atoi(bondMiimon)
-	bondLinkObj.FailOverMac = netlink.BondFailOverMac(failOverMac)
-
 	if err != nil {
 		return nil, fmt.Errorf("Failed to convert bondMiimon value (%+v) to an int, error: %+v", bondMiimon, err)
 	}
+	if bondMTU != 0 {
+		bondLinkObj.MTU = bondMTU
+	}
+	bondLinkObj.FailOverMac = netlink.BondFailOverMac(failOverMac)
 
 	err = netNsHandle.LinkAdd(bondLinkObj)
 	if err != nil {
@@ -225,6 +229,41 @@ func setLinksinNetNs(bondConf *bondingConfig, nspath string, releaseLinks bool) 
 	return nil
 }
 
+func validateMTU(slaveLinks []netlink.Link, mtu int) error {
+	if mtu == 0 {
+		return nil
+	}
+	if mtu < 68 {
+		return fmt.Errorf("Invalid bond MTU value (%+v), should be 68 or bigger", mtu)
+	}
+	netHandle, err := netlink.NewHandle()
+	if err != nil {
+		return fmt.Errorf("Failed to create a new handle, error: %+v", err)
+	}
+	defer netHandle.Delete()
+
+	pfLinks, err := netHandle.LinkList()
+	if err != nil {
+		return 	fmt.Errorf("Failed to lookup physical functions links, error: %+v", err)
+	}
+	for _, pfLink := range pfLinks {
+		vritualFunctions := pfLink.Attrs().Vfs
+		if vritualFunctions == nil || len(vritualFunctions) == 0 {
+			continue
+		}
+		for _, vf := range vritualFunctions {
+			for _, vfLink := range slaveLinks {
+				if bytes.Equal(vf.Mac, vfLink.Attrs().HardwareAddr) {
+					if mtu > pfLink.Attrs().MTU {
+						return 	fmt.Errorf("Invalid MTU (%+v). The requested MTU for bond is bigger than that of the physical function (%+v) owning the slave link (%+v)", mtu, pfLink.Attrs().Name, pfLink.Attrs().MTU)
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func createBond(bondConf *bondingConfig, nspath string, ns ns.NetNS) (*current.Interface, error) {
 	bond := &current.Interface{}
 
@@ -252,10 +291,16 @@ func createBond(bondConf *bondingConfig, nspath string, ns ns.NetNS) (*current.I
 	if err != nil {
 		return nil, fmt.Errorf("Failed to retrieve link objects from configuration file (%+v), error: %+v", bondConf, err)
 	}
+
+	err = validateMTU(linkObjectsToBond, bondConf.MTU)
+	if err != nil {
+		return nil, err
+	}
+
 	if bondConf.FailOverMac < 0 || bondConf.FailOverMac > 2 {
 		return nil, fmt.Errorf("FailOverMac mode should be 0, 1 or 2 actual: %+v", bondConf.FailOverMac)
 	}
-	bondLinkObj, err := createBondedLink(bondConf.Name, bondConf.Mode, bondConf.Miimon, bondConf.FailOverMac, netNsHandle)
+	bondLinkObj, err := createBondedLink(bondConf.Name, bondConf.Mode, bondConf.Miimon, bondConf.MTU, bondConf.FailOverMac, netNsHandle)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create bonded link (%+v), error: %+v", bondConf.Name, err)
 	}
