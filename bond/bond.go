@@ -244,7 +244,7 @@ func validateMTU(slaveLinks []netlink.Link, mtu int) error {
 
 	pfLinks, err := netHandle.LinkList()
 	if err != nil {
-		return 	fmt.Errorf("Failed to lookup physical functions links, error: %+v", err)
+		return fmt.Errorf("Failed to lookup physical functions links, error: %+v", err)
 	}
 	for _, pfLink := range pfLinks {
 		vritualFunctions := pfLink.Attrs().Vfs
@@ -255,7 +255,7 @@ func validateMTU(slaveLinks []netlink.Link, mtu int) error {
 			for _, vfLink := range slaveLinks {
 				if bytes.Equal(vf.Mac, vfLink.Attrs().HardwareAddr) {
 					if mtu > pfLink.Attrs().MTU {
-						return 	fmt.Errorf("Invalid MTU (%+v). The requested MTU for bond is bigger than that of the physical function (%+v) owning the slave link (%+v)", mtu, pfLink.Attrs().Name, pfLink.Attrs().MTU)
+						return fmt.Errorf("Invalid MTU (%+v). The requested MTU for bond is bigger than that of the physical function (%+v) owning the slave link (%+v)", mtu, pfLink.Attrs().Name, pfLink.Attrs().MTU)
 					}
 				}
 			}
@@ -351,9 +351,12 @@ func cmdAdd(args *skel.CmdArgs) error {
 		return err
 	}
 
+	// Initialize an L2 default result.
 	result := &current.Result{
 		CNIVersion: cniVersion,
+		Interfaces: []*current.Interface{bondInterface},
 	}
+
 	// run the IPAM plugin and get back the config to apply
 	if bondConf.IPAM.Type != "" {
 		r, err := ipam.ExecAdd(bondConf.IPAM.Type, args.StdinData)
@@ -361,20 +364,21 @@ func cmdAdd(args *skel.CmdArgs) error {
 			return err
 		}
 		// Convert whatever the IPAM result was into the current Result type
-		result, err := current.NewResultFromResult(r)
+		ipamResult, err := current.NewResultFromResult(r)
 		if err != nil {
 			return err
 		}
 
-		if len(result.IPs) == 0 {
+		if len(ipamResult.IPs) == 0 {
 			return errors.New("IPAM plugin returned missing IP config")
 		}
-		for _, ipc := range result.IPs {
+		for _, ipc := range ipamResult.IPs {
 			// All addresses belong to the vlan interface
 			ipc.Interface = current.Int(0)
 		}
 
-		result.Interfaces = []*current.Interface{bondInterface}
+		result.IPs = ipamResult.IPs
+		result.Routes = ipamResult.Routes
 
 		err = netns.Do(func(_ ns.NetNS) error {
 			return ipam.ConfigureIface(bondConf.Name, result)
@@ -386,8 +390,6 @@ func cmdAdd(args *skel.CmdArgs) error {
 		result.DNS = bondConf.DNS
 
 	}
-
-	result.Interfaces = []*current.Interface{bondInterface}
 
 	return types.PrintResult(result, cniVersion)
 
