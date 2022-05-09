@@ -29,7 +29,6 @@ The binary should be placed at /opt/cni/bin on all nodes on which bonding will t
 
 - name (string, required): the name of the network
 - type (string, required): &quot;bond&quot;
-- ifname (string, optional): name of the bond interface
 - miimon (int, required): specifies the arp link monitoring frequency in milliseconds
 - mtu (int, optional): the mtu of the bond. Default is 1500.
 - failOverMac (int, optional): specifies the failOverMac setting for the bond. Should be set to 1 for active-backup bond modes. Default is 0.
@@ -172,7 +171,6 @@ spec:
   "type": "bond",
   "cniVersion": "0.3.1",
   "name": "bond-net1",
-  "ifname": "bond0",
   "mode": "active-backup",
   "failOverMac": 1,
   "linksInContainer": true,

@@ -37,7 +37,6 @@ import (
 
 type bondingConfig struct {
 	types.NetConf
-	Name        string                   `json:"ifname"`
 	Mode        string                   `json:"mode"`
 	LinksContNs bool                     `json:"linksInContainer"`
 	FailOverMac int                      `json:"failOverMac"`
@@ -264,7 +263,7 @@ func validateMTU(slaveLinks []netlink.Link, mtu int) error {
 	return nil
 }
 
-func createBond(bondConf *bondingConfig, nspath string, ns ns.NetNS) (*current.Interface, error) {
+func createBond(bondName string, bondConf *bondingConfig, nspath string, ns ns.NetNS) (*current.Interface, error) {
 	bond := &current.Interface{}
 
 	// get the namespace from the CNI_NETNS environment variable
@@ -300,9 +299,9 @@ func createBond(bondConf *bondingConfig, nspath string, ns ns.NetNS) (*current.I
 	if bondConf.FailOverMac < 0 || bondConf.FailOverMac > 2 {
 		return nil, fmt.Errorf("FailOverMac mode should be 0, 1 or 2 actual: %+v", bondConf.FailOverMac)
 	}
-	bondLinkObj, err := createBondedLink(bondConf.Name, bondConf.Mode, bondConf.Miimon, bondConf.MTU, bondConf.FailOverMac, netNsHandle)
+	bondLinkObj, err := createBondedLink(bondName, bondConf.Mode, bondConf.Miimon, bondConf.MTU, bondConf.FailOverMac, netNsHandle)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create bonded link (%+v), error: %+v", bondConf.Name, err)
+		return nil, fmt.Errorf("Failed to create bonded link (%+v), error: %+v", bondName, err)
 	}
 
 	err = attachLinksToBond(bondLinkObj, linkObjectsToBond, netNsHandle)
@@ -314,7 +313,7 @@ func createBond(bondConf *bondingConfig, nspath string, ns ns.NetNS) (*current.I
 		return nil, fmt.Errorf("Failed to set bond link UP, error: %v", err)
 	}
 
-	bond.Name = bondConf.Name
+	bond.Name = bondName
 
 	// Re-fetch interface to get all properties/attributes
 	contBond, err := netNsHandle.LinkByName(bond.Name)
@@ -342,11 +341,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 	defer netns.Close()
 
-	if bondConf.Name == "" {
-		bondConf.Name = args.IfName
-	}
-
-	bondInterface, err := createBond(bondConf, args.Netns, netns)
+	bondInterface, err := createBond(args.IfName, bondConf, args.Netns, netns)
 	if err != nil {
 		return err
 	}
@@ -381,7 +376,7 @@ func cmdAdd(args *skel.CmdArgs) error {
 		result.Routes = ipamResult.Routes
 
 		err = netns.Do(func(_ ns.NetNS) error {
-			return ipam.ConfigureIface(bondConf.Name, result)
+			return ipam.ConfigureIface(args.IfName, result)
 		})
 		if err != nil {
 			return err
@@ -427,16 +422,12 @@ func cmdDel(args *skel.CmdArgs) error {
 	}
 	defer netNsHandle.Delete()
 
-	if bondConf.Name == "" {
-		bondConf.Name = args.IfName
-	}
-
 	linkObjectsToDeattach, err := getLinkObjectsFromConfig(bondConf, netNsHandle)
 	if err != nil {
 		return fmt.Errorf("Failed to retrieve link objects from configuration file (%+v), error: %+v", bondConf, err)
 	}
 
-	linkObjToDel, err := checkLinkExists(bondConf.Name, netNsHandle)
+	linkObjToDel, err := checkLinkExists(args.IfName, netNsHandle)
 	if err != nil {
 		return fmt.Errorf("Failed to find bonded link (%+v), error: %+v", bondConf.Name, err)
 	}
