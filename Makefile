@@ -8,3 +8,6 @@ gofmt:
 
 build-bin:
 	./build.sh
+
+test: build-bin # Tests need sudo due to network interfaces creation
+	sudo -E bash -c "umask 0; PATH=${GOPATH}/bin:$(pwd)/bin:${PATH} go test ./bond/"
