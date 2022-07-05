@@ -229,9 +229,11 @@ func setLinksinNetNs(bondConf *bondingConfig, nspath string, releaseLinks bool) 
 }
 
 func validateMTU(slaveLinks []netlink.Link, mtu int) error {
+	// if not specified set MTU to default
 	if mtu == 0 {
-		return nil
+		mtu = 1500
 	}
+
 	if mtu < 68 {
 		return fmt.Errorf("Invalid bond MTU value (%+v), should be 68 or bigger", mtu)
 	}
@@ -240,6 +242,13 @@ func validateMTU(slaveLinks []netlink.Link, mtu int) error {
 		return fmt.Errorf("Failed to create a new handle, error: %+v", err)
 	}
 	defer netHandle.Delete()
+
+	// handle the nics like macvlan, ipvlan, etc..
+	for _, link := range slaveLinks {
+		if mtu > link.Attrs().MTU {
+			return fmt.Errorf("Invalid MTU (%+v). The requested MTU for bond is bigger than that of the slave link (%+v), slave MTU (%+v)", mtu, link.Attrs().Name, link.Attrs().MTU)
+		}
+	}
 
 	pfLinks, err := netHandle.LinkList()
 	if err != nil {
@@ -260,6 +269,7 @@ func validateMTU(slaveLinks []netlink.Link, mtu int) error {
 			}
 		}
 	}
+
 	return nil
 }
 
