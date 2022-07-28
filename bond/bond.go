@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"runtime"
-
 	"strconv"
 
 	"github.com/containernetworking/cni/pkg/skel"
@@ -31,6 +30,7 @@ import (
 	"github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ipam"
 	"github.com/containernetworking/plugins/pkg/ns"
+	"github.com/intel/bond-cni/bond/util"
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
 )
@@ -129,7 +129,11 @@ func createBondedLink(bondName string, bondMode string, bondMiimon string, bondM
 // loop over the linkObjectsToBond, set each DOWN, update the interface MASTER & set it UP again.
 // again we use the netNsHandle to interfact with these links in the namespace provided. return error
 func attachLinksToBond(bondLinkObj *netlink.Bond, linkObjectsToBond []netlink.Link, netNsHandle *netlink.Handle) error {
-	var err error
+	err := util.HandleMacDuplicates(linkObjectsToBond, netNsHandle)
+	if err != nil {
+		return fmt.Errorf("Failed to handle duplicated macs on link slaves, error: %+v", err)
+	}
+
 	bondLinkIndex := bondLinkObj.LinkAttrs.Index
 	for _, linkObject := range linkObjectsToBond {
 		err = netNsHandle.LinkSetDown(linkObject)

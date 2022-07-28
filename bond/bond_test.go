@@ -29,14 +29,14 @@ import (
 )
 
 const (
-    IfName string = "bond0"
-    Slave1 string = "net1"
-    Slave2 string = "net2"
-    Config string = `{
+	IfName string = "bond0"
+	Slave1 string = "net1"
+	Slave2 string = "net2"
+	Config string = `{
 			"name": "bond",
 			"type": "bond",
 			"cniVersion": "%s",
-			"mode": "active-backup",
+			"mode": "%s",
 			"failOverMac": 1,
 			"linksInContainer": true,
 			"miimon": "100",
@@ -46,6 +46,8 @@ const (
 				{"name": "net2"}
 			]
 		}`
+	ActiveBackupMode = "active-backup"
+	BalanceTlbMode   = "balance-tlb"
 )
 
 var Slaves = []string{Slave1, Slave2}
@@ -85,7 +87,7 @@ var _ = Describe("tuning plugin", func() {
 			ContainerID: "dummy",
 			Netns:       podNS.Path(),
 			IfName:      IfName,
-			StdinData:   []byte(fmt.Sprintf(Config, "0.3.1")),
+			StdinData:   []byte(fmt.Sprintf(Config, "0.3.1", ActiveBackupMode)),
 		}
 
 		err := podNS.Do(func(ns.NetNS) error {
@@ -108,7 +110,7 @@ var _ = Describe("tuning plugin", func() {
 			Expect(err).NotTo(HaveOccurred())
 			bond := link.(*netlink.Bond)
 			Expect(bond.Attrs().MTU).To(Equal(1400))
-			Expect(bond.Mode.String()).To(Equal("active-backup"))
+			Expect(bond.Mode.String()).To(Equal(ActiveBackupMode))
 			Expect(bond.Miimon).To(Equal(100))
 
 			By("validating the bond slaves are configured correctly")
@@ -136,7 +138,7 @@ var _ = Describe("tuning plugin", func() {
 				ContainerID: "dummy",
 				Netns:       podNS.Path(),
 				IfName:      IfName,
-				StdinData:   []byte(fmt.Sprintf(Config, version)),
+				StdinData:   []byte(fmt.Sprintf(Config, version, ActiveBackupMode)),
 			}
 			err := podNS.Do(func(ns.NetNS) error {
 				defer GinkgoRecover()
@@ -170,7 +172,7 @@ var _ = Describe("tuning plugin", func() {
 				ContainerID: "dummy",
 				Netns:       podNS.Path(),
 				IfName:      IfName,
-				StdinData:   []byte(fmt.Sprintf(Config, version)),
+				StdinData:   []byte(fmt.Sprintf(Config, version, ActiveBackupMode)),
 			}
 			err := podNS.Do(func(ns.NetNS) error {
 				defer GinkgoRecover()
@@ -204,7 +206,7 @@ var _ = Describe("tuning plugin", func() {
 				ContainerID: "dummy",
 				Netns:       podNS.Path(),
 				IfName:      IfName,
-				StdinData:   []byte(fmt.Sprintf(Config, version)),
+				StdinData:   []byte(fmt.Sprintf(Config, version, ActiveBackupMode)),
 			}
 			err := podNS.Do(func(ns.NetNS) error {
 				defer GinkgoRecover()
@@ -230,5 +232,41 @@ var _ = Describe("tuning plugin", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 		}
+	})
+
+	It("verifies the plugin copes with duplicated macs in balance-tlb mode", func() {
+		args := &skel.CmdArgs{
+			ContainerID: "dummy",
+			Netns:       podNS.Path(),
+			IfName:      IfName,
+			StdinData:   []byte(fmt.Sprintf(Config, "0.3.1", BalanceTlbMode)),
+		}
+
+		err := podNS.Do(func(ns.NetNS) error {
+			defer GinkgoRecover()
+
+			slave1, err := netlink.LinkByName(Slave1)
+			Expect(err).NotTo(HaveOccurred())
+
+			slave2, err := netlink.LinkByName(Slave2)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = netlink.LinkSetHardwareAddr(slave2, slave1.Attrs().HardwareAddr)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("creating the plugin")
+			r, _, err := testutils.CmdAddWithArgs(args, func() error {
+				return cmdAdd(args)
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("checking the bond was created")
+			result, err := types100.GetResult(r)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(result.Interfaces)).To(Equal(1))
+			Expect(result.Interfaces[0].Name).To(Equal(IfName))
+			return nil
+		})
+		Expect(err).NotTo(HaveOccurred())
 	})
 })
