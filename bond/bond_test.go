@@ -269,4 +269,56 @@ var _ = Describe("tuning plugin", func() {
 		})
 		Expect(err).NotTo(HaveOccurred())
 	})
+
+	It("verifies the plugin handles duplicated macs on delete", func() {
+		args := &skel.CmdArgs{
+			ContainerID: "dummy",
+			Netns:       podNS.Path(),
+			IfName:      IfName,
+			StdinData:   []byte(fmt.Sprintf(Config, "0.3.1", ActiveBackupMode)),
+		}
+
+		err := podNS.Do(func(ns.NetNS) error {
+			defer GinkgoRecover()
+
+			slave1, err := netlink.LinkByName(Slave1)
+			Expect(err).NotTo(HaveOccurred())
+
+			slave2, err := netlink.LinkByName(Slave2)
+			Expect(err).NotTo(HaveOccurred())
+
+			err = netlink.LinkSetHardwareAddr(slave2, slave1.Attrs().HardwareAddr)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("creating the plugin")
+			r, _, err := testutils.CmdAddWithArgs(args, func() error {
+				return cmdAdd(args)
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("checking the bond was created")
+			result, err := types100.GetResult(r)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(len(result.Interfaces)).To(Equal(1))
+			Expect(result.Interfaces[0].Name).To(Equal(IfName))
+
+			By("duplicating the macs on the slaves")
+			err = netlink.LinkSetHardwareAddr(slave2, slave1.Attrs().HardwareAddr)
+			Expect(err).NotTo(HaveOccurred())
+
+
+			By("deleting the plugin")
+			err = testutils.CmdDel(podNS.Path(),
+				args.ContainerID, "", func() error { return cmdDel(args) })
+			Expect(err).NotTo(HaveOccurred())
+
+			By("validating the macs are not duplicated")
+			slave1, err = netlink.LinkByName(Slave1)
+			Expect(err).NotTo(HaveOccurred())
+			slave2, err = netlink.LinkByName(Slave2)
+			Expect(slave1.Attrs().HardwareAddr.String()).NotTo(Equal(slave2.Attrs().HardwareAddr.String()))
+			return nil
+		})
+		Expect(err).NotTo(HaveOccurred())
+	})
 })
