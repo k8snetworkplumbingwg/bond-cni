@@ -409,6 +409,10 @@ func cmdDel(args *skel.CmdArgs) error {
 		return fmt.Errorf("Failed to deattached links from bond, error: %+v", err)
 	}
 
+	if err = util.HandleMacDuplicates(linkObjectsToDeattach, netNsHandle); err != nil {
+		return fmt.Errorf("Failed to validate deattached links macs, error: %+v", err)
+	}
+
 	err = netNsHandle.LinkDel(linkObjToDel)
 	if err != nil {
 		return fmt.Errorf("Failed to delete bonded link (%+v), error: %+v", linkObjToDel.Attrs().Name, err)
