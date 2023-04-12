@@ -194,7 +194,7 @@ func setLinksinNetNs(bondConf *bondingConfig, nspath string, releaseLinks bool) 
 		return fmt.Errorf("failed to get init netns: %v", err)
 	}
 
-	if releaseLinks == true {
+	if releaseLinks {
 		if err := netNs.Set(); err != nil {
 			return fmt.Errorf("failed to enter netns %q: %v", netNs, err)
 		}
@@ -213,7 +213,7 @@ func setLinksinNetNs(bondConf *bondingConfig, nspath string, releaseLinks bool) 
 				return fmt.Errorf("failed to down link interface %q: %v", linkName, err)
 			}
 
-			if releaseLinks == true { // move link inteface to network netns
+			if releaseLinks { // move link inteface to network netns
 				if err = netlink.LinkSetNsFd(link, int(curnetNs.Fd())); err != nil {
 					return fmt.Errorf("failed to move link interface to host netns %q: %v", linkName, err)
 				}
@@ -246,9 +246,9 @@ func createBond(bondName string, bondConf *bondingConfig, nspath string, ns ns.N
 	if err != nil {
 		return nil, fmt.Errorf("Failed to create a new handle at netNs (%+v), error: %+v", netNs, err)
 	}
-	defer netNsHandle.Delete()
+	defer netNsHandle.Close()
 
-	if bondConf.LinksContNs != true {
+	if !bondConf.LinksContNs {
 		if err := setLinksinNetNs(bondConf, nspath, false); err != nil {
 			return nil, fmt.Errorf("Failed to move the links (%+v) in container network namespace, error: %+v", bondConf.Links, err)
 		}
@@ -388,7 +388,7 @@ func cmdDel(args *skel.CmdArgs) error {
 	if err != nil {
 		return fmt.Errorf("Failed to create a new handle at netNs (%+v), error: %+v", netNs, err)
 	}
-	defer netNsHandle.Delete()
+	defer netNsHandle.Close()
 
 	linkObjectsToDeattach, err := getLinkObjectsFromConfig(bondConf, netNsHandle)
 	if err != nil {
@@ -418,7 +418,7 @@ func cmdDel(args *skel.CmdArgs) error {
 		return fmt.Errorf("Failed to delete bonded link (%+v), error: %+v", linkObjToDel.Attrs().Name, err)
 	}
 
-	if bondConf.LinksContNs != true {
+	if !bondConf.LinksContNs {
 		if err := setLinksinNetNs(bondConf, args.Netns, true); err != nil {
 			return fmt.Errorf("Failed set links (%+v) in host network namespace, error: %+v", bondConf.Links, err)
 		}

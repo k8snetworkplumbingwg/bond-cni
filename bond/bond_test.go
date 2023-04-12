@@ -315,6 +315,7 @@ var _ = Describe("tuning plugin", func() {
 			slave1, err = netlink.LinkByName(Slave1)
 			Expect(err).NotTo(HaveOccurred())
 			slave2, err = netlink.LinkByName(Slave2)
+			Expect(err).NotTo(HaveOccurred())
 			Expect(slave1.Attrs().HardwareAddr.String()).NotTo(Equal(slave2.Attrs().HardwareAddr.String()))
 			return nil
 		})
