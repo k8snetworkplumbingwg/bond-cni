@@ -52,7 +52,7 @@ const (
 
 var Slaves = []string{Slave1, Slave2}
 
-var _ = Describe("tuning plugin", func() {
+var _ = Describe("bond plugin", func() {
 	var podNS ns.NetNS
 
 	BeforeEach(func() {
@@ -127,6 +127,71 @@ var _ = Describe("tuning plugin", func() {
 			Expect(err).NotTo(HaveOccurred())
 			_, err = netlink.LinkByName(IfName)
 			Expect(err).To(HaveOccurred())
+			return nil
+		})
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("verifies the plugin handles multiple del commands", func() {
+		args := &skel.CmdArgs{
+			ContainerID: "dummy",
+			Netns:       podNS.Path(),
+			IfName:      IfName,
+			StdinData:   []byte(fmt.Sprintf(Config, "1.0.0", ActiveBackupMode)),
+		}
+
+		err := podNS.Do(func(ns.NetNS) error {
+			defer GinkgoRecover()
+
+			By("adding a bond interface")
+			_, _, err := testutils.CmdAddWithArgs(args, func() error {
+				return cmdAdd(args)
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("deleting the bond interface")
+			err = testutils.CmdDel(podNS.Path(),
+				args.ContainerID, "", func() error { return cmdDel(args) })
+			Expect(err).NotTo(HaveOccurred())
+
+			By("deleting again the bond interface")
+			err = testutils.CmdDel(podNS.Path(),
+				args.ContainerID, "", func() error { return cmdDel(args) })
+			Expect(err).NotTo(HaveOccurred())
+
+			return nil
+		})
+		Expect(err).NotTo(HaveOccurred())
+	})
+
+	It("verifies the del command does not fail when a device (in container) assigned to the bond has been deleted", func() {
+		args := &skel.CmdArgs{
+			ContainerID: "dummy",
+			Netns:       podNS.Path(),
+			IfName:      IfName,
+			StdinData:   []byte(fmt.Sprintf(Config, "1.0.0", ActiveBackupMode)),
+		}
+
+		err := podNS.Do(func(ns.NetNS) error {
+			defer GinkgoRecover()
+
+			By("adding a bond interface")
+			_, _, err := testutils.CmdAddWithArgs(args, func() error {
+				return cmdAdd(args)
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("deleting a slave interface")
+			slave, err := netlink.LinkByName(Slave1)
+			Expect(err).NotTo(HaveOccurred())
+			err = netlink.LinkDel(slave)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("deleting the bond interface")
+			err = testutils.CmdDel(podNS.Path(),
+				args.ContainerID, "", func() error { return cmdDel(args) })
+			Expect(err).NotTo(HaveOccurred())
+
 			return nil
 		})
 		Expect(err).NotTo(HaveOccurred())
