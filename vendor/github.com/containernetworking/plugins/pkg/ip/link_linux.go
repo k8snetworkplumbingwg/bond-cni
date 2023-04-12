@@ -36,9 +36,8 @@ var (
 func makeVethPair(name, peer string, mtu int, mac string, hostNS ns.NetNS) (netlink.Link, error) {
 	veth := &netlink.Veth{
 		LinkAttrs: netlink.LinkAttrs{
-			Name:  name,
-			Flags: net.FlagUp,
-			MTU:   mtu,
+			Name: name,
+			MTU:  mtu,
 		},
 		PeerName:      peer,
 		PeerNamespace: netlink.NsFd(int(hostNS.Fd())),
@@ -107,7 +106,7 @@ func makeVeth(name, vethPeerName string, mtu int, mac string, hostNS ns.NetNS) (
 // RandomVethName returns string "veth" with random prefix (hashed from entropy)
 func RandomVethName() (string, error) {
 	entropy := make([]byte, 4)
-	_, err := rand.Reader.Read(entropy)
+	_, err := rand.Read(entropy)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate random veth name: %v", err)
 	}
@@ -144,10 +143,6 @@ func SetupVethWithName(contVethName, hostVethName string, mtu int, contVethMac s
 	hostVethName, contVeth, err := makeVeth(contVethName, hostVethName, mtu, contVethMac, hostNS)
 	if err != nil {
 		return net.Interface{}, net.Interface{}, err
-	}
-
-	if err = netlink.LinkSetUp(contVeth); err != nil {
-		return net.Interface{}, net.Interface{}, fmt.Errorf("failed to set %q up: %v", contVethName, err)
 	}
 
 	var hostVeth netlink.Link

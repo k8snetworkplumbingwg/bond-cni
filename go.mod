@@ -1,24 +1,25 @@
 module github.com/intel/bond-cni
 
-go 1.17
+go 1.19
 
 require (
-	github.com/containernetworking/cni v1.0.1
-	github.com/containernetworking/plugins v1.0.1
-	github.com/onsi/ginkgo v1.16.4
-	github.com/onsi/gomega v1.15.0
-	github.com/vishvananda/netlink v1.1.1-0.20210330154013-f5de75959ad5
-	github.com/vishvananda/netns v0.0.0-20211101163701-50045581ed74
+	github.com/containernetworking/cni v1.1.2
+	github.com/containernetworking/plugins v1.2.0
+	github.com/onsi/ginkgo v1.16.5
+	github.com/onsi/gomega v1.27.6
+	github.com/vishvananda/netlink v1.2.1-beta.2
+	github.com/vishvananda/netns v0.0.4
 )
 
 require (
 	github.com/coreos/go-iptables v0.6.0 // indirect
 	github.com/fsnotify/fsnotify v1.4.9 // indirect
+	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/nxadm/tail v1.4.8 // indirect
-	github.com/safchain/ethtool v0.0.0-20210803160452-9aa261dae9b1 // indirect
-	golang.org/x/net v0.0.0-20210428140749-89ef3d95e781 // indirect
-	golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f // indirect
-	golang.org/x/text v0.3.8 // indirect
+	github.com/safchain/ethtool v0.2.0 // indirect
+	golang.org/x/net v0.8.0 // indirect
+	golang.org/x/sys v0.6.0 // indirect
+	golang.org/x/text v0.8.0 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
