@@ -20,7 +20,7 @@ func ValidateMTU(slaveLinks []netlink.Link, mtu int) error {
 	if err != nil {
 		return fmt.Errorf("Failed to create a new handle, error: %+v", err)
 	}
-	defer netHandle.Delete()
+	defer netHandle.Close()
 
 	// handle the nics like macvlan, ipvlan, etc..
 	for _, link := range slaveLinks {
@@ -35,7 +35,7 @@ func ValidateMTU(slaveLinks []netlink.Link, mtu int) error {
 	}
 	for _, pfLink := range pfLinks {
 		vritualFunctions := pfLink.Attrs().Vfs
-		if vritualFunctions == nil || len(vritualFunctions) == 0 {
+		if len(vritualFunctions) == 0 {
 			continue
 		}
 		for _, vf := range vritualFunctions {
