@@ -23,7 +23,7 @@ import (
 
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/testutils"
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/vishvananda/netlink"
 )
@@ -305,7 +305,6 @@ var _ = Describe("tuning plugin", func() {
 			By("duplicating the macs on the slaves")
 			err = netlink.LinkSetHardwareAddr(slave2, slave1.Attrs().HardwareAddr)
 			Expect(err).NotTo(HaveOccurred())
-
 
 			By("deleting the plugin")
 			err = testutils.CmdDel(podNS.Path(),
