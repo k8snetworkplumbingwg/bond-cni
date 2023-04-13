@@ -68,7 +68,7 @@ func loadConfigFile(bytes []byte) (*bondingConfig, string, error) {
 }
 
 // retrieve the link names from the bondConf & check they exist. return an array of linkObjectsToBond & error
-func getLinkObjectsFromConfig(bondConf *bondingConfig, netNsHandle *netlink.Handle) ([]netlink.Link, error) {
+func getLinkObjectsFromConfig(bondConf *bondingConfig, netNsHandle *netlink.Handle, isDel bool) ([]netlink.Link, error) {
 	linkNames := []string{}
 	for _, linkName := range bondConf.Links {
 		s, ok := linkName["name"].(string)
@@ -77,28 +77,28 @@ func getLinkObjectsFromConfig(bondConf *bondingConfig, netNsHandle *netlink.Hand
 		}
 		linkNames = append(linkNames, s)
 	}
-	linkObjectsToBond := []netlink.Link{}
-	if len(linkNames) >= 2 { // currently supporting two or more links to one bond
-		for _, linkName := range linkNames {
-			linkObject, err := checkLinkExists(linkName, netNsHandle)
-			if err != nil {
-				return nil, fmt.Errorf("Failed to confirm that link (%+v) exists, error: %+v", linkName, err)
-			}
-			linkObjectsToBond = append(linkObjectsToBond, linkObject)
-		}
-	} else {
+
+	// currently supporting two or more links to one bond.
+	if len(linkNames) < 2 {
 		return nil, fmt.Errorf("Bonding requires at least two links, we have %+v", len(linkNames))
 	}
-	return linkObjectsToBond, nil
-}
 
-// check if a "linkName" exists. return the linkObject & error
-func checkLinkExists(linkName string, netNsHandle *netlink.Handle) (netlink.Link, error) {
-	link, err := netNsHandle.LinkByName(linkName)
-	if err != nil {
-		return nil, fmt.Errorf("Failed to lookup link name %+v, error: %+v", linkName, err)
+	linkObjectsToBond := []netlink.Link{}
+	for _, linkName := range linkNames {
+		linkObject, err := netNsHandle.LinkByName(linkName)
+		if err != nil {
+			// Do not fail if device in container assigned to the bond has been deleted.
+			// This device might have been deleted by another plugin.
+			_, ok := err.(netlink.LinkNotFoundError)
+			if !ok || !isDel || !bondConf.LinksContNs {
+				return nil, fmt.Errorf("Failed to confirm that link (%+v) exists, error: %+v", linkName, err)
+			}
+		} else {
+			linkObjectsToBond = append(linkObjectsToBond, linkObject)
+		}
 	}
-	return link, nil
+
+	return linkObjectsToBond, nil
 }
 
 // configure the bonded link & add it using the netNsHandle context to add it to the required namespace. return a bondLinkObj pointer & error
@@ -254,7 +254,7 @@ func createBond(bondName string, bondConf *bondingConfig, nspath string, ns ns.N
 		}
 	}
 
-	linkObjectsToBond, err := getLinkObjectsFromConfig(bondConf, netNsHandle)
+	linkObjectsToBond, err := getLinkObjectsFromConfig(bondConf, netNsHandle, false)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to retrieve link objects from configuration file (%+v), error: %+v", bondConf, err)
 	}
@@ -390,14 +390,18 @@ func cmdDel(args *skel.CmdArgs) error {
 	}
 	defer netNsHandle.Close()
 
-	linkObjectsToDeattach, err := getLinkObjectsFromConfig(bondConf, netNsHandle)
+	linkObjToDel, err := netNsHandle.LinkByName(args.IfName)
 	if err != nil {
-		return fmt.Errorf("Failed to retrieve link objects from configuration file (%+v), error: %+v", bondConf, err)
+		// Do not fail if the device is already removed. Delete can be called multiple times.
+		if _, ok := err.(netlink.LinkNotFoundError); ok {
+			return nil
+		}
+		return fmt.Errorf("Failed to find bonded link (%+v), error: %+v", bondConf.Name, err)
 	}
 
-	linkObjToDel, err := checkLinkExists(args.IfName, netNsHandle)
+	linkObjectsToDeattach, err := getLinkObjectsFromConfig(bondConf, netNsHandle, true)
 	if err != nil {
-		return fmt.Errorf("Failed to find bonded link (%+v), error: %+v", bondConf.Name, err)
+		return fmt.Errorf("Failed to retrieve link objects from configuration file (%+v), error: %+v", bondConf, err)
 	}
 
 	err = netNsHandle.LinkSetDown(linkObjToDel)
