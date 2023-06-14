@@ -68,7 +68,7 @@ func loadConfigFile(bytes []byte) (*bondingConfig, string, error) {
 }
 
 // retrieve the link names from the bondConf & check they exist. return an array of linkObjectsToBond & error
-func getLinkObjectsFromConfig(bondConf *bondingConfig, netNsHandle *netlink.Handle, isDel bool) ([]netlink.Link, error) {
+func getLinkObjectsFromConfig(bondConf *bondingConfig, netNsHandle *netlink.Handle, releaseLinks bool) ([]netlink.Link, error) {
 	linkNames := []string{}
 	for _, linkName := range bondConf.Links {
 		s, ok := linkName["name"].(string)
@@ -90,7 +90,7 @@ func getLinkObjectsFromConfig(bondConf *bondingConfig, netNsHandle *netlink.Hand
 			// Do not fail if device in container assigned to the bond has been deleted.
 			// This device might have been deleted by another plugin.
 			_, ok := err.(netlink.LinkNotFoundError)
-			if !ok || !isDel || !bondConf.LinksContNs {
+			if !ok || !releaseLinks {
 				return nil, fmt.Errorf("Failed to confirm that link (%+v) exists, error: %+v", linkName, err)
 			}
 		} else {
