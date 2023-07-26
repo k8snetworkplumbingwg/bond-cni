@@ -1,5 +1,7 @@
 # Bond CNI plugin
 
+[![Coverage Status](https://coveralls.io/repos/github/k8snetworkplumbingwg/bond-cni/badge.svg?branch=master)](https://coveralls.io/github/k8snetworkplumbingwg/bond-cni?branch=master)
+
 - Bonding provides a method for aggregating multiple network interfaces into a single logical &quot;bonded&quot; interface.
 - According to the 802.3ad specification, Linux Bonding drivers provides various flavours of bonded interfaces depending on the mode (bonding policies), such as round robin, active aggregation
 - When Bond CNI is configured as a standalone plugin, interfaces are obtained from the host network namespace. With these physical interfaces a bonded interface is created in the container network namespace.
