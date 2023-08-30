@@ -173,8 +173,8 @@ func deattachLinksFromBond(linkObjectsToDeattach []netlink.Link, netNsHandle *ne
 	return nil
 }
 
-func setLinksinNetNs(bondConf *bondingConfig, nspath string, releaseLinks bool) error {
-	var netNs, curnetNs ns.NetNS
+func setLinksInNetNs(bondConf *bondingConfig, nspath string, releaseLinks bool) error {
+	var podNs, hostNS ns.NetNS
 	var err error
 
 	linkNames := []string{}
@@ -186,22 +186,27 @@ func setLinksinNetNs(bondConf *bondingConfig, nspath string, releaseLinks bool) 
 		linkNames = append(linkNames, s)
 	}
 
-	if netNs, err = ns.GetNS(nspath); err != nil {
+	if podNs, err = ns.GetNS(nspath); err != nil {
 		return fmt.Errorf("failed to open netns %q: %v", nspath, err)
 	}
+	defer podNs.Close()
 
-	if curnetNs, err = ns.GetCurrentNS(); err != nil {
+	if hostNS, err = ns.GetCurrentNS(); err != nil {
 		return fmt.Errorf("failed to get init netns: %v", err)
 	}
 
 	if releaseLinks {
-		if err := netNs.Set(); err != nil {
-			return fmt.Errorf("failed to enter netns %q: %v", netNs, err)
-		}
+		return moveLinksBetweenNs(linkNames, podNs, hostNS, "host")
 	}
+	return moveLinksBetweenNs(linkNames, hostNS, podNs, "container")
+}
 
-	if len(linkNames) >= 2 { // currently supporting two or more links to one bond
-		for _, linkName := range linkNames {
+func moveLinksBetweenNs(links []string, from ns.NetNS, to ns.NetNS, toNsName string) error {
+	return from.Do(func(ns.NetNS) error {
+		if len(links) < 2 { // currently supporting two or more links to one bond
+			return fmt.Errorf("Bonding requires at least two links, we have %+v", len(links))
+		}
+		for _, linkName := range links {
 			// get interface link in the network namespace
 			link, err := netlink.LinkByName(linkName)
 			if err != nil {
@@ -213,22 +218,13 @@ func setLinksinNetNs(bondConf *bondingConfig, nspath string, releaseLinks bool) 
 				return fmt.Errorf("failed to down link interface %q: %v", linkName, err)
 			}
 
-			if releaseLinks { // move link inteface to network netns
-				if err = netlink.LinkSetNsFd(link, int(curnetNs.Fd())); err != nil {
-					return fmt.Errorf("failed to move link interface to host netns %q: %v", linkName, err)
-				}
-			} else {
-				if err = netlink.LinkSetNsFd(link, int(netNs.Fd())); err != nil {
-					return fmt.Errorf("failed to move link interface to container netns %q: %v", linkName, err)
-				}
+			// move link interface to network netns
+			if err = netlink.LinkSetNsFd(link, int(to.Fd())); err != nil {
+				return fmt.Errorf("failed to move link interface to %s netns %q: %v", toNsName, linkName, err)
 			}
-
 		}
-	} else {
-		return fmt.Errorf("Bonding requires at least two links, we have %+v", len(linkNames))
-	}
-
-	return nil
+		return nil
+	})
 }
 
 func createBond(bondName string, bondConf *bondingConfig, nspath string, ns ns.NetNS) (*current.Interface, error) {
@@ -249,7 +245,7 @@ func createBond(bondName string, bondConf *bondingConfig, nspath string, ns ns.N
 	defer netNsHandle.Close()
 
 	if !bondConf.LinksContNs {
-		if err := setLinksinNetNs(bondConf, nspath, false); err != nil {
+		if err := setLinksInNetNs(bondConf, nspath, false); err != nil {
 			return nil, fmt.Errorf("Failed to move the links (%+v) in container network namespace, error: %+v", bondConf.Links, err)
 		}
 	}
@@ -423,7 +419,7 @@ func cmdDel(args *skel.CmdArgs) error {
 	}
 
 	if !bondConf.LinksContNs {
-		if err := setLinksinNetNs(bondConf, args.Netns, true); err != nil {
+		if err := setLinksInNetNs(bondConf, args.Netns, true); err != nil {
 			return fmt.Errorf("Failed set links (%+v) in host network namespace, error: %+v", bondConf.Links, err)
 		}
 	}
