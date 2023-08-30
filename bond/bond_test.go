@@ -43,7 +43,7 @@ const (
 			"failOverMac": 1,
 			"linksInContainer": %s,
 			"miimon": "100",
-			"mtu": 1400,
+			"mtu": %s,
 			"links": [
 				{"name": "net1"},
 				{"name": "net2"}
@@ -51,6 +51,7 @@ const (
 		}`
 	ActiveBackupMode = "active-backup"
 	BalanceTlbMode   = "balance-tlb"
+	DefaultMTU       = 1400
 )
 
 var Slaves = []string{Slave1, Slave2}
@@ -60,11 +61,6 @@ var _ = Describe("bond plugin", func() {
 	var initNS ns.NetNS
 	var args *skel.CmdArgs
 	var linksInContainer bool
-	var linkAttrs = []netlink.LinkAttrs{
-		{Name: Slave1},
-		{Name: Slave2},
-	}
-
 	AfterEach(func() {
 		Expect(podNS.Close()).To(Succeed())
 		Expect(testutils.UnmountNS(podNS)).To(Succeed())
@@ -74,6 +70,10 @@ var _ = Describe("bond plugin", func() {
 		BeforeEach(func() {
 			var err error
 			linksInContainer = true
+			linkAttrs := []netlink.LinkAttrs{
+				{Name: Slave1},
+				{Name: Slave2},
+			}
 			podNS, err = testutils.NewNS()
 			Expect(err).NotTo(HaveOccurred())
 			addLinksInNS(podNS, linkAttrs)
@@ -81,7 +81,7 @@ var _ = Describe("bond plugin", func() {
 				ContainerID: "dummy",
 				Netns:       podNS.Path(),
 				IfName:      IfName,
-				StdinData:   []byte(fmt.Sprintf(Config, "0.3.1", ActiveBackupMode, strconv.FormatBool(true))),
+				StdinData:   []byte(fmt.Sprintf(Config, "1.0.0", ActiveBackupMode, strconv.FormatBool(linksInContainer), strconv.Itoa(DefaultMTU))),
 			}
 		})
 
@@ -92,7 +92,7 @@ var _ = Describe("bond plugin", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 
-			By("validationg the returned result is correct")
+			By("validating the returned result is correct")
 			checkAddReturnResult(&r, IfName)
 
 			err = podNS.Do(func(ns.NetNS) error {
@@ -100,18 +100,10 @@ var _ = Describe("bond plugin", func() {
 				By("validating the bond interface is configured correctly")
 				link, err := netlink.LinkByName(IfName)
 				Expect(err).NotTo(HaveOccurred())
-				bond := link.(*netlink.Bond)
-				Expect(bond.Attrs().MTU).To(Equal(1400))
-				Expect(bond.Mode.String()).To(Equal(ActiveBackupMode))
-				Expect(bond.Miimon).To(Equal(100))
+				validateBondIFConf(link, DefaultMTU, ActiveBackupMode, 100)
 
 				By("validating the bond slaves are configured correctly")
-				for _, slaveName := range Slaves {
-					slave, err := netlink.LinkByName(slaveName)
-					Expect(err).NotTo(HaveOccurred())
-					Expect(slave.Attrs().Slave).NotTo(BeNil())
-					Expect(slave.Attrs().MasterIndex).To(Equal(bond.Attrs().Index))
-				}
+				validateBondSlavesConf(link, Slaves)
 				return nil
 			})
 			Expect(err).NotTo(HaveOccurred())
@@ -178,7 +170,7 @@ var _ = Describe("bond plugin", func() {
 
 		DescribeTable("verifies the plugin returns correct results for supported tested versions", func(version string) {
 
-			args.StdinData = []byte(fmt.Sprintf(Config, version, ActiveBackupMode, strconv.FormatBool(linksInContainer)))
+			args.StdinData = []byte(fmt.Sprintf(Config, version, ActiveBackupMode, strconv.FormatBool(linksInContainer), strconv.Itoa(DefaultMTU)))
 
 			By(fmt.Sprintf("creating the plugin with config in version %s", version))
 			r, _, err := testutils.CmdAddWithArgs(args, func() error {
@@ -203,7 +195,7 @@ var _ = Describe("bond plugin", func() {
 		)
 
 		It("verifies the plugin copes with duplicated macs in balance-tlb mode", func() {
-			args.StdinData = []byte(fmt.Sprintf(Config, "0.3.1", BalanceTlbMode, strconv.FormatBool(linksInContainer)))
+			args.StdinData = []byte(fmt.Sprintf(Config, "0.3.1", BalanceTlbMode, strconv.FormatBool(linksInContainer), strconv.Itoa(DefaultMTU)))
 
 			err := podNS.Do(func(ns.NetNS) error {
 				defer GinkgoRecover()
@@ -283,10 +275,47 @@ var _ = Describe("bond plugin", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
+	When("Links Have Custom MTU", func() {
+		const Slave1Mtu = 1000
+		const Slave2Mtu = 800
+
+		BeforeEach(func() {
+			var err error
+			linksInContainer = true
+			linkAttrs := []netlink.LinkAttrs{
+				{MTU: Slave1Mtu, Name: Slave1},
+				{MTU: Slave2Mtu, Name: Slave2},
+			}
+			podNS, err = testutils.NewNS()
+			Expect(err).NotTo(HaveOccurred())
+			addLinksInNS(podNS, linkAttrs)
+		})
+
+		DescribeTable("Verify plugin raises error when Bond MTU is bigger then links MTU", func(bondMTU string) {
+			args := &skel.CmdArgs{
+				ContainerID: "dummy",
+				Netns:       podNS.Path(),
+				IfName:      IfName,
+				StdinData:   []byte(fmt.Sprintf(Config, "0.3.1", ActiveBackupMode, strconv.FormatBool(linksInContainer), bondMTU)),
+			}
+			By("creating the plugin")
+			_, _, err := testutils.CmdAddWithArgs(args, func() error {
+				return cmdAdd(args)
+			})
+			Expect(err).To(HaveOccurred())
+		},
+			Entry("Bond MTU is bigger then one of links MTU", "1200"),
+			Entry("Bond MTU is bigger then all of links MTU", "900"),
+		)
+	})
 	When("links are in the initial network namespace at initial state (meaning linksInContainer is false)", func() {
 		BeforeEach(func() {
 			var err error
 			linksInContainer = false
+			linkAttrs := []netlink.LinkAttrs{
+				{Name: Slave1},
+				{Name: Slave2},
+			}
 			podNS, err = testutils.NewNS()
 			Expect(err).NotTo(HaveOccurred())
 			initNS, err = testutils.NewNS()
@@ -303,7 +332,7 @@ var _ = Describe("bond plugin", func() {
 				ContainerID: "dummy",
 				Netns:       podNS.Path(),
 				IfName:      IfName,
-				StdinData:   []byte(fmt.Sprintf(Config, "0.3.1", ActiveBackupMode, strconv.FormatBool(linksInContainer))),
+				StdinData:   []byte(fmt.Sprintf(Config, "0.3.1", ActiveBackupMode, strconv.FormatBool(linksInContainer), strconv.Itoa(DefaultMTU))),
 			}
 			err := initNS.Do(func(ns.NetNS) error {
 				defer GinkgoRecover()
@@ -324,7 +353,7 @@ var _ = Describe("bond plugin", func() {
 				By("validating the bond interface is configured correctly")
 				link, err := netlink.LinkByName(IfName)
 				Expect(err).NotTo(HaveOccurred())
-				validateBondIFConf(link, 1400, ActiveBackupMode, 100)
+				validateBondIFConf(link, DefaultMTU, ActiveBackupMode, 100)
 
 				By("validating the bond slaves are configured correctly")
 				validateBondSlavesConf(link, Slaves)

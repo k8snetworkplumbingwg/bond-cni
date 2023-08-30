@@ -7,13 +7,19 @@ import (
 	"github.com/vishvananda/netlink"
 )
 
+const (
+	standardEthernetMTU = 1500
+	defaultMTU          = standardEthernetMTU
+	minMtuIpv4Packet    = 68
+)
+
 func ValidateMTU(slaveLinks []netlink.Link, mtu int) error {
 	// if not specified set MTU to default
 	if mtu == 0 {
-		mtu = 1500
+		mtu = defaultMTU
 	}
 
-	if mtu < 68 {
+	if mtu < minMtuIpv4Packet {
 		return fmt.Errorf("Invalid bond MTU value (%+v), should be 68 or bigger", mtu)
 	}
 	netHandle, err := netlink.NewHandle()
