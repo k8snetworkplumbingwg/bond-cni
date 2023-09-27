@@ -37,7 +37,7 @@ github.com/google/go-cmp/cmp/internal/value
 # github.com/google/pprof v0.0.0-20230323073829-e72429f035bd
 ## explicit; go 1.19
 github.com/google/pprof/profile
-# github.com/onsi/ginkgo/v2 v2.12.0
+# github.com/onsi/ginkgo/v2 v2.12.1
 ## explicit; go 1.18
 github.com/onsi/ginkgo/v2
 github.com/onsi/ginkgo/v2/config
@@ -87,7 +87,7 @@ golang.org/x/net/context
 golang.org/x/net/html
 golang.org/x/net/html/atom
 golang.org/x/net/html/charset
-# golang.org/x/sys v0.11.0
+# golang.org/x/sys v0.12.0
 ## explicit; go 1.17
 golang.org/x/sys/unix
 # golang.org/x/text v0.12.0
