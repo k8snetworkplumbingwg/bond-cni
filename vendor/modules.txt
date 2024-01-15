@@ -37,7 +37,7 @@ github.com/google/go-cmp/cmp/internal/value
 # github.com/google/pprof v0.0.0-20230323073829-e72429f035bd
 ## explicit; go 1.19
 github.com/google/pprof/profile
-# github.com/onsi/ginkgo/v2 v2.13.2
+# github.com/onsi/ginkgo/v2 v2.14.0
 ## explicit; go 1.18
 github.com/onsi/ginkgo/v2
 github.com/onsi/ginkgo/v2/config
@@ -81,8 +81,8 @@ github.com/vishvananda/netlink/nl
 # github.com/vishvananda/netns v0.0.4
 ## explicit; go 1.17
 github.com/vishvananda/netns
-# golang.org/x/net v0.17.0
-## explicit; go 1.17
+# golang.org/x/net v0.19.0
+## explicit; go 1.18
 golang.org/x/net/context
 golang.org/x/net/html
 golang.org/x/net/html/atom
@@ -90,8 +90,8 @@ golang.org/x/net/html/charset
 # golang.org/x/sys v0.15.0
 ## explicit; go 1.18
 golang.org/x/sys/unix
-# golang.org/x/text v0.13.0
-## explicit; go 1.17
+# golang.org/x/text v0.14.0
+## explicit; go 1.18
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
 golang.org/x/text/encoding/htmlindex
@@ -109,10 +109,9 @@ golang.org/x/text/internal/utf8internal
 golang.org/x/text/language
 golang.org/x/text/runes
 golang.org/x/text/transform
-# golang.org/x/tools v0.14.0
+# golang.org/x/tools v0.16.1
 ## explicit; go 1.18
 golang.org/x/tools/go/ast/inspector
-golang.org/x/tools/internal/typeparams
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
