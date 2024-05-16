@@ -6,7 +6,7 @@ require (
 	github.com/containernetworking/cni v1.1.2
 	github.com/containernetworking/plugins v1.4.0
 	github.com/onsi/ginkgo/v2 v2.17.3
-	github.com/onsi/gomega v1.33.0
+	github.com/onsi/gomega v1.33.1
 	github.com/vishvananda/netlink v1.2.1-beta.2
 	github.com/vishvananda/netns v0.0.4
 )
