@@ -3,7 +3,7 @@ module github.com/intel/bond-cni
 go 1.21
 
 require (
-	github.com/containernetworking/cni v1.2.0
+	github.com/containernetworking/cni v1.2.2
 	github.com/containernetworking/plugins v1.5.1
 	github.com/onsi/ginkgo/v2 v2.19.0
 	github.com/onsi/gomega v1.33.1
