@@ -59,10 +59,10 @@ func init() {
 func loadConfigFile(bytes []byte) (*bondingConfig, string, error) {
 	bondConf := &bondingConfig{}
 	if err := json.Unmarshal(bytes, bondConf); err != nil {
-		return nil, "", fmt.Errorf("Failed to load configuration file, error = %+v", err)
+		return nil, "", fmt.Errorf("failed to load configuration file, error = %+v", err)
 	}
 	if bondConf.IPAM.Type == bondCni {
-		return nil, "", fmt.Errorf("Bond is not a suitable IPAM type")
+		return nil, "", fmt.Errorf("bond is not a suitable IPAM type")
 	}
 	return bondConf, bondConf.CNIVersion, nil
 }
@@ -80,7 +80,7 @@ func getLinkObjectsFromConfig(bondConf *bondingConfig, netNsHandle *netlink.Hand
 
 	// currently supporting two or more links to one bond.
 	if len(linkNames) < 2 {
-		return nil, fmt.Errorf("Bonding requires at least two links, we have %+v", len(linkNames))
+		return nil, fmt.Errorf("bonding requires at least two links, we have %+v", len(linkNames))
 	}
 
 	linkObjectsToBond := []netlink.Link{}
@@ -91,7 +91,7 @@ func getLinkObjectsFromConfig(bondConf *bondingConfig, netNsHandle *netlink.Hand
 			// This device might have been deleted by another plugin.
 			_, ok := err.(netlink.LinkNotFoundError)
 			if !ok || !releaseLinks {
-				return nil, fmt.Errorf("Failed to confirm that link (%+v) exists, error: %+v", linkName, err)
+				return nil, fmt.Errorf("failed to confirm that link (%+v) exists, error: %+v", linkName, err)
 			}
 		} else {
 			linkObjectsToBond = append(linkObjectsToBond, linkObject)
@@ -110,7 +110,7 @@ func createBondedLink(bondName string, bondMode string, bondMiimon string, bondM
 	bondLinkObj.Mode = bondModeObj
 	bondLinkObj.Miimon, err = strconv.Atoi(bondMiimon)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to convert bondMiimon value (%+v) to an int, error: %+v", bondMiimon, err)
+		return nil, fmt.Errorf("failed to convert bondMiimon value (%+v) to an int, error: %+v", bondMiimon, err)
 	}
 	if bondMTU != 0 {
 		bondLinkObj.MTU = bondMTU
@@ -119,7 +119,7 @@ func createBondedLink(bondName string, bondMode string, bondMiimon string, bondM
 
 	err = netNsHandle.LinkAdd(bondLinkObj)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to add link (%+v) to the netNsHandle, error: %+v", bondLinkObj.Attrs().Name, err)
+		return nil, fmt.Errorf("failed to add link (%+v) to the netNsHandle, error: %+v", bondLinkObj.Attrs().Name, err)
 	}
 
 	return bondLinkObj, nil
@@ -130,22 +130,22 @@ func createBondedLink(bondName string, bondMode string, bondMiimon string, bondM
 func attachLinksToBond(bondLinkObj *netlink.Bond, linkObjectsToBond []netlink.Link, netNsHandle *netlink.Handle) error {
 	err := util.HandleMacDuplicates(linkObjectsToBond, netNsHandle)
 	if err != nil {
-		return fmt.Errorf("Failed to handle duplicated macs on link slaves, error: %+v", err)
+		return fmt.Errorf("failed to handle duplicated macs on link slaves, error: %+v", err)
 	}
 
-	bondLinkIndex := bondLinkObj.LinkAttrs.Index
+	bondLinkIndex := bondLinkObj.Index
 	for _, linkObject := range linkObjectsToBond {
 		err = netNsHandle.LinkSetDown(linkObject)
 		if err != nil {
-			return fmt.Errorf("Failed to set link: %+v DOWN, error: %+v", linkObject.Attrs().Name, err)
+			return fmt.Errorf("failed to set link: %+v DOWN, error: %+v", linkObject.Attrs().Name, err)
 		}
 		err = netNsHandle.LinkSetMasterByIndex(linkObject, bondLinkIndex)
 		if err != nil {
-			return fmt.Errorf("Failed to set link: %+v MASTER, master index used: %+v, error: %+v", linkObject.Attrs().Name, bondLinkIndex, err)
+			return fmt.Errorf("failed to set link: %+v MASTER, master index used: %+v, error: %+v", linkObject.Attrs().Name, bondLinkIndex, err)
 		}
 		err = netNsHandle.LinkSetUp(linkObject)
 		if err != nil {
-			return fmt.Errorf("Failed to set link: %+v UP, error: %+v", linkObject.Attrs().Name, err)
+			return fmt.Errorf("failed to set link: %+v UP, error: %+v", linkObject.Attrs().Name, err)
 		}
 	}
 	return nil
@@ -159,15 +159,15 @@ func deattachLinksFromBond(linkObjectsToDeattach []netlink.Link, netNsHandle *ne
 	for _, linkObject := range linkObjectsToDeattach {
 		err = netNsHandle.LinkSetDown(linkObject)
 		if err != nil {
-			return fmt.Errorf("Failed to set link: %+v DOWN, error: %+v", linkObject.Attrs().Name, err)
+			return fmt.Errorf("failed to set link: %+v DOWN, error: %+v", linkObject.Attrs().Name, err)
 		}
 		err = netNsHandle.LinkSetNoMaster(linkObject)
 		if err != nil {
-			return fmt.Errorf("Failed to set link: %+v NOMASTER, error: %+v", linkObject.Attrs().Name, err)
+			return fmt.Errorf("failed to set link: %+v NOMASTER, error: %+v", linkObject.Attrs().Name, err)
 		}
 		err = netNsHandle.LinkSetUp(linkObject)
 		if err != nil {
-			return fmt.Errorf("Failed to set link: %+v UP, error: %+v", linkObject.Attrs().Name, err)
+			return fmt.Errorf("failed to set link: %+v UP, error: %+v", linkObject.Attrs().Name, err)
 		}
 	}
 	return nil
@@ -189,7 +189,9 @@ func setLinksInNetNs(bondConf *bondingConfig, nspath string, releaseLinks bool) 
 	if podNs, err = ns.GetNS(nspath); err != nil {
 		return fmt.Errorf("failed to open netns %q: %v", nspath, err)
 	}
-	defer podNs.Close()
+	defer func() {
+		_ = podNs.Close()
+	}()
 
 	if hostNS, err = ns.GetCurrentNS(); err != nil {
 		return fmt.Errorf("failed to get init netns: %v", err)
@@ -204,7 +206,7 @@ func setLinksInNetNs(bondConf *bondingConfig, nspath string, releaseLinks bool) 
 func moveLinksBetweenNs(links []string, from ns.NetNS, to ns.NetNS, toNsName string) error {
 	return from.Do(func(ns.NetNS) error {
 		if len(links) < 2 { // currently supporting two or more links to one bond
-			return fmt.Errorf("Bonding requires at least two links, we have %+v", len(links))
+			return fmt.Errorf("bonding requires at least two links, we have %+v", len(links))
 		}
 		for _, linkName := range links {
 			// get interface link in the network namespace
@@ -233,26 +235,28 @@ func createBond(bondName string, bondConf *bondingConfig, nspath string, ns ns.N
 	// get the namespace from the CNI_NETNS environment variable
 	netNs, err := netns.GetFromPath(nspath)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to retrieve netNs from path (%+v), error: %+v", nspath, err)
+		return nil, fmt.Errorf("failed to retrieve netNs from path (%+v), error: %+v", nspath, err)
 	}
-	defer netNs.Close()
+	defer func() {
+		_ = netNs.Close()
+	}()
 
 	// get a handle for the namespace above, this handle will be used to interact with existing links and add a new one
 	netNsHandle, err := netlink.NewHandleAt(netNs)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create a new handle at netNs (%+v), error: %+v", netNs, err)
+		return nil, fmt.Errorf("failed to create a new handle at netNs (%+v), error: %+v", netNs, err)
 	}
 	defer netNsHandle.Close()
 
 	if !bondConf.LinksContNs {
 		if err := setLinksInNetNs(bondConf, nspath, false); err != nil {
-			return nil, fmt.Errorf("Failed to move the links (%+v) in container network namespace, error: %+v", bondConf.Links, err)
+			return nil, fmt.Errorf("failed to move the links (%+v) in container network namespace, error: %+v", bondConf.Links, err)
 		}
 	}
 
 	linkObjectsToBond, err := getLinkObjectsFromConfig(bondConf, netNsHandle, false)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to retrieve link objects from configuration file (%+v), error: %+v", bondConf, err)
+		return nil, fmt.Errorf("failed to retrieve link objects from configuration file (%+v), error: %+v", bondConf, err)
 	}
 
 	err = util.ValidateMTU(linkObjectsToBond, bondConf.MTU)
@@ -265,16 +269,16 @@ func createBond(bondName string, bondConf *bondingConfig, nspath string, ns ns.N
 	}
 	bondLinkObj, err := createBondedLink(bondName, bondConf.Mode, bondConf.Miimon, bondConf.MTU, bondConf.FailOverMac, netNsHandle)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to create bonded link (%+v), error: %+v", bondName, err)
+		return nil, fmt.Errorf("failed to create bonded link (%+v), error: %+v", bondName, err)
 	}
 
 	err = attachLinksToBond(bondLinkObj, linkObjectsToBond, netNsHandle)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to attached links to bond, error: %+v", err)
+		return nil, fmt.Errorf("failed to attached links to bond, error: %+v", err)
 	}
 
 	if err := netNsHandle.LinkSetUp(bondLinkObj); err != nil {
-		return nil, fmt.Errorf("Failed to set bond link UP, error: %v", err)
+		return nil, fmt.Errorf("failed to set bond link UP, error: %v", err)
 	}
 
 	bond.Name = bondName
@@ -303,7 +307,9 @@ func cmdAdd(args *skel.CmdArgs) error {
 	if err != nil {
 		return fmt.Errorf("failed to open netns %q: %v", netns, err)
 	}
-	defer netns.Close()
+	defer func() {
+		_ = netns.Close()
+	}()
 
 	bondInterface, err := createBond(args.IfName, bondConf, args.Netns, netns)
 	if err != nil {
@@ -376,13 +382,15 @@ func cmdDel(args *skel.CmdArgs) error {
 	// get the namespace from the CNI_NETNS environment variable
 	netNs, err := netns.GetFromPath(args.Netns)
 	if err != nil {
-		return fmt.Errorf("Failed to retrieve netNs from path (%+v), error: %+v", args.Netns, err)
+		return fmt.Errorf("failed to retrieve netNs from path (%+v), error: %+v", args.Netns, err)
 	}
-	defer netNs.Close()
+	defer func() {
+		_ = netNs.Close()
+	}()
 	// get a handle for the namespace above, this handle will be used to interact with existing links and add a new one
 	netNsHandle, err := netlink.NewHandleAt(netNs)
 	if err != nil {
-		return fmt.Errorf("Failed to create a new handle at netNs (%+v), error: %+v", netNs, err)
+		return fmt.Errorf("failed to create a new handle at netNs (%+v), error: %+v", netNs, err)
 	}
 	defer netNsHandle.Close()
 
@@ -392,35 +400,35 @@ func cmdDel(args *skel.CmdArgs) error {
 		if _, ok := err.(netlink.LinkNotFoundError); ok {
 			return nil
 		}
-		return fmt.Errorf("Failed to find bonded link (%+v), error: %+v", bondConf.Name, err)
+		return fmt.Errorf("failed to find bonded link (%+v), error: %+v", bondConf.Name, err)
 	}
 
 	linkObjectsToDeattach, err := getLinkObjectsFromConfig(bondConf, netNsHandle, true)
 	if err != nil {
-		return fmt.Errorf("Failed to retrieve link objects from configuration file (%+v), error: %+v", bondConf, err)
+		return fmt.Errorf("failed to retrieve link objects from configuration file (%+v), error: %+v", bondConf, err)
 	}
 
 	err = netNsHandle.LinkSetDown(linkObjToDel)
 	if err != nil {
-		return fmt.Errorf("Failed to set bonded link: %+v DOWN, error: %+v", linkObjToDel.Attrs().Name, err)
+		return fmt.Errorf("failed to set bonded link: %+v DOWN, error: %+v", linkObjToDel.Attrs().Name, err)
 	}
 
 	if err = deattachLinksFromBond(linkObjectsToDeattach, netNsHandle); err != nil {
-		return fmt.Errorf("Failed to deattached links from bond, error: %+v", err)
+		return fmt.Errorf("failed to deattached links from bond, error: %+v", err)
 	}
 
 	if err = util.HandleMacDuplicates(linkObjectsToDeattach, netNsHandle); err != nil {
-		return fmt.Errorf("Failed to validate deattached links macs, error: %+v", err)
+		return fmt.Errorf("failed to validate deattached links macs, error: %+v", err)
 	}
 
 	err = netNsHandle.LinkDel(linkObjToDel)
 	if err != nil {
-		return fmt.Errorf("Failed to delete bonded link (%+v), error: %+v", linkObjToDel.Attrs().Name, err)
+		return fmt.Errorf("failed to delete bonded link (%+v), error: %+v", linkObjToDel.Attrs().Name, err)
 	}
 
 	if !bondConf.LinksContNs {
 		if err := setLinksInNetNs(bondConf, args.Netns, true); err != nil {
-			return fmt.Errorf("Failed set links (%+v) in host network namespace, error: %+v", bondConf.Links, err)
+			return fmt.Errorf("failed set links (%+v) in host network namespace, error: %+v", bondConf.Links, err)
 		}
 	}
 
