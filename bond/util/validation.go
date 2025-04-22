@@ -20,24 +20,24 @@ func ValidateMTU(slaveLinks []netlink.Link, mtu int) error {
 	}
 
 	if mtu < minMtuIpv4Packet {
-		return fmt.Errorf("Invalid bond MTU value (%+v), should be 68 or bigger", mtu)
+		return fmt.Errorf("invalid bond MTU value (%+v), should be 68 or bigger", mtu)
 	}
 	netHandle, err := netlink.NewHandle()
 	if err != nil {
-		return fmt.Errorf("Failed to create a new handle, error: %+v", err)
+		return fmt.Errorf("failed to create a new handle, error: %+v", err)
 	}
 	defer netHandle.Close()
 
 	// handle the nics like macvlan, ipvlan, etc..
 	for _, link := range slaveLinks {
 		if mtu > link.Attrs().MTU {
-			return fmt.Errorf("Invalid MTU (%+v). The requested MTU for bond is bigger than that of the slave link (%+v), slave MTU (%+v)", mtu, link.Attrs().Name, link.Attrs().MTU)
+			return fmt.Errorf("invalid MTU (%+v). The requested MTU for bond is bigger than that of the slave link (%+v), slave MTU (%+v)", mtu, link.Attrs().Name, link.Attrs().MTU)
 		}
 	}
 
 	pfLinks, err := netHandle.LinkList()
 	if err != nil {
-		return fmt.Errorf("Failed to lookup physical functions links, error: %+v", err)
+		return fmt.Errorf("failed to lookup physical functions links, error: %+v", err)
 	}
 	for _, pfLink := range pfLinks {
 		vritualFunctions := pfLink.Attrs().Vfs
@@ -48,7 +48,7 @@ func ValidateMTU(slaveLinks []netlink.Link, mtu int) error {
 			for _, vfLink := range slaveLinks {
 				if bytes.Equal(vf.Mac, vfLink.Attrs().HardwareAddr) {
 					if mtu > pfLink.Attrs().MTU {
-						return fmt.Errorf("Invalid MTU (%+v). The requested MTU for bond is bigger than that of the physical function (%+v) owning the slave link (%+v)", mtu, pfLink.Attrs().Name, pfLink.Attrs().MTU)
+						return fmt.Errorf("invalid MTU (%+v). The requested MTU for bond is bigger than that of the physical function (%+v) owning the slave link (%+v)", mtu, pfLink.Attrs().Name, pfLink.Attrs().MTU)
 					}
 				}
 			}
