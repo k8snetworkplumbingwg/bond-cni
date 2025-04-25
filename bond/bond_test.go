@@ -40,7 +40,7 @@ const (
 			"type": "bond",
 			"cniVersion": "%s",
 			"mode": "%s",
-			"failOverMac": 1,
+			"failOverMac": %d,
 			"linksInContainer": %s,
 			"miimon": "100",
 			"mtu": %s,
@@ -81,7 +81,7 @@ var _ = Describe("bond plugin", func() {
 				ContainerID: "dummy",
 				Netns:       podNS.Path(),
 				IfName:      IfName,
-				StdinData:   []byte(fmt.Sprintf(Config, "1.0.0", ActiveBackupMode, strconv.FormatBool(linksInContainer), strconv.Itoa(DefaultMTU))),
+				StdinData:   []byte(fmt.Sprintf(Config, "1.0.0", ActiveBackupMode, 1, strconv.FormatBool(linksInContainer), strconv.Itoa(DefaultMTU))),
 			}
 		})
 
@@ -170,7 +170,7 @@ var _ = Describe("bond plugin", func() {
 
 		DescribeTable("verifies the plugin returns correct results for supported tested versions", func(version string) {
 
-			args.StdinData = []byte(fmt.Sprintf(Config, version, ActiveBackupMode, strconv.FormatBool(linksInContainer), strconv.Itoa(DefaultMTU)))
+			args.StdinData = []byte(fmt.Sprintf(Config, version, ActiveBackupMode, 1, strconv.FormatBool(linksInContainer), strconv.Itoa(DefaultMTU)))
 
 			By(fmt.Sprintf("creating the plugin with config in version %s", version))
 			r, _, err := testutils.CmdAddWithArgs(args, func() error {
@@ -195,7 +195,7 @@ var _ = Describe("bond plugin", func() {
 		)
 
 		It("verifies the plugin copes with duplicated macs in balance-tlb mode", func() {
-			args.StdinData = []byte(fmt.Sprintf(Config, "0.3.1", BalanceTlbMode, strconv.FormatBool(linksInContainer), strconv.Itoa(DefaultMTU)))
+			args.StdinData = []byte(fmt.Sprintf(Config, "0.3.1", BalanceTlbMode, 1, strconv.FormatBool(linksInContainer), strconv.Itoa(DefaultMTU)))
 
 			err := podNS.Do(func(ns.NetNS) error {
 				defer GinkgoRecover()
@@ -274,6 +274,89 @@ var _ = Describe("bond plugin", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 		})
+
+		It("verifies that mac addresses are restored correctly in active-backup with fail_over_mac 0", func() {
+			var bond netlink.Link
+			var slave1 netlink.Link
+			var slave2 netlink.Link
+			var err error
+
+			By("storing mac addresses of slaves")
+			err = podNS.Do(func(ns.NetNS) error {
+				defer GinkgoRecover()
+				slave1, err = netlink.LinkByName(Slave1)
+				Expect(err).NotTo(HaveOccurred())
+
+				slave2, err = netlink.LinkByName(Slave2)
+				Expect(err).NotTo(HaveOccurred())
+
+				return nil
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			macSlave1 := slave1.Attrs().HardwareAddr.String()
+			macSlave2 := slave2.Attrs().HardwareAddr.String()
+
+			By("creating the bond with fail_over_mac 0 to force the backup to change the mac")
+			args = &skel.CmdArgs{
+				ContainerID: "dummy",
+				Netns:       podNS.Path(),
+				IfName:      IfName,
+				StdinData:   []byte(fmt.Sprintf(Config, "1.0.0", ActiveBackupMode, 0, strconv.FormatBool(linksInContainer), strconv.Itoa(DefaultMTU))),
+			}
+
+			r, _, err := testutils.CmdAddWithArgs(args, func() error {
+				return cmdAdd(args)
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("checking that all slaves have the same mac address")
+			checkAddReturnResult(&r, IfName)
+
+			err = podNS.Do(func(ns.NetNS) error {
+				defer GinkgoRecover()
+				bond, err = netlink.LinkByName(IfName)
+				Expect(err).NotTo(HaveOccurred())
+
+				slave1, err = netlink.LinkByName(Slave1)
+				Expect(err).NotTo(HaveOccurred())
+
+				slave2, err = netlink.LinkByName(Slave2)
+				Expect(err).NotTo(HaveOccurred())
+
+				return nil
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(bond.Attrs().HardwareAddr.String()).To(Equal(slave1.Attrs().HardwareAddr.String()))
+			Expect(bond.Attrs().HardwareAddr.String()).To(Equal(slave2.Attrs().HardwareAddr.String()))
+
+			By("deleting the bond")
+			err = testutils.CmdDel(podNS.Path(),
+				args.ContainerID, "", func() error { return cmdDel(args) })
+			Expect(err).NotTo(HaveOccurred())
+
+			By("fetching the slaves mac addresses again")
+			err = podNS.Do(func(ns.NetNS) error {
+				defer GinkgoRecover()
+
+				_, err = netlink.LinkByName(IfName)
+				Expect(err).To(HaveOccurred())
+
+				slave1, err = netlink.LinkByName(Slave1)
+				Expect(err).NotTo(HaveOccurred())
+
+				slave2, err = netlink.LinkByName(Slave2)
+				Expect(err).NotTo(HaveOccurred())
+
+				return nil
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			By("checking that the mac addresses of the slaves are restored")
+			Expect(slave1.Attrs().HardwareAddr.String()).To(Equal(macSlave1))
+			Expect(slave2.Attrs().HardwareAddr.String()).To(Equal(macSlave2))
+		})
 	})
 	When("Links Have Custom MTU", func() {
 		const Slave1Mtu = 1000
@@ -296,7 +379,7 @@ var _ = Describe("bond plugin", func() {
 				ContainerID: "dummy",
 				Netns:       podNS.Path(),
 				IfName:      IfName,
-				StdinData:   []byte(fmt.Sprintf(Config, "0.3.1", ActiveBackupMode, strconv.FormatBool(linksInContainer), bondMTU)),
+				StdinData:   []byte(fmt.Sprintf(Config, "0.3.1", ActiveBackupMode, 1, strconv.FormatBool(linksInContainer), bondMTU)),
 			}
 			By("creating the plugin")
 			_, _, err := testutils.CmdAddWithArgs(args, func() error {
@@ -332,7 +415,7 @@ var _ = Describe("bond plugin", func() {
 				ContainerID: "dummy",
 				Netns:       podNS.Path(),
 				IfName:      IfName,
-				StdinData:   []byte(fmt.Sprintf(Config, "0.3.1", ActiveBackupMode, strconv.FormatBool(linksInContainer), strconv.Itoa(DefaultMTU))),
+				StdinData:   []byte(fmt.Sprintf(Config, "0.3.1", ActiveBackupMode, 1, strconv.FormatBool(linksInContainer), strconv.Itoa(DefaultMTU))),
 			}
 			err := initNS.Do(func(ns.NetNS) error {
 				defer GinkgoRecover()

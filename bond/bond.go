@@ -417,6 +417,15 @@ func cmdDel(args *skel.CmdArgs) error {
 		return fmt.Errorf("failed to deattached links from bond, error: %+v", err)
 	}
 
+	// Fetch slave links again to have the latest state
+	// For instance, Active-backup mode with fail_over_mac=0 reverts the mac address of backup slaves
+	for i := range linkObjectsToDeattach {
+		linkObjectsToDeattach[i], err = netNsHandle.LinkByName(linkObjectsToDeattach[i].Attrs().Name)
+		if err != nil {
+			return fmt.Errorf("failed to find link (%+v), error: %+v", linkObjectsToDeattach[i].Attrs().Name, err)
+		}
+	}
+
 	if err = util.HandleMacDuplicates(linkObjectsToDeattach, netNsHandle); err != nil {
 		return fmt.Errorf("failed to validate deattached links macs, error: %+v", err)
 	}
