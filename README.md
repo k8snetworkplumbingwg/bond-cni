@@ -54,6 +54,7 @@ Given the following network configuration:
 		"miimon": "100",
 		"mtu": 1500,
                 "failOverMac": 1,
+                "allSlavesActive": 0,
 		"links": [
             {
 				"name": "ens3f2"
