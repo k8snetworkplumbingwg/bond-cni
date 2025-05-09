@@ -36,12 +36,13 @@ import (
 
 type bondingConfig struct {
 	types.NetConf
-	Mode        string                   `json:"mode"`
-	LinksContNs bool                     `json:"linksInContainer"`
-	FailOverMac int                      `json:"failOverMac"`
-	Miimon      string                   `json:"miimon"`
-	Links       []map[string]interface{} `json:"links"`
-	MTU         int                      `json:"mtu"`
+	Mode            string                   `json:"mode"`
+	LinksContNs     bool                     `json:"linksInContainer"`
+	FailOverMac     int                      `json:"failOverMac"`
+	Miimon          string                   `json:"miimon"`
+	Links           []map[string]interface{} `json:"links"`
+	MTU             int                      `json:"mtu"`
+	AllSlavesActive *int                     `json:"allSlavesActive,omitempty"`
 }
 
 var (
@@ -61,9 +62,15 @@ func loadConfigFile(bytes []byte) (*bondingConfig, string, error) {
 	if err := json.Unmarshal(bytes, bondConf); err != nil {
 		return nil, "", fmt.Errorf("failed to load configuration file, error = %+v", err)
 	}
+
 	if bondConf.IPAM.Type == bondCni {
 		return nil, "", fmt.Errorf("bond is not a suitable IPAM type")
 	}
+
+	if bondConf.AllSlavesActive != nil && *bondConf.AllSlavesActive != 0 && *bondConf.AllSlavesActive != 1 {
+		return nil, "", fmt.Errorf("allSlavesActive should be 0 or 1, actual: %+v", *bondConf.AllSlavesActive)
+	}
+
 	return bondConf, bondConf.CNIVersion, nil
 }
 
@@ -102,20 +109,29 @@ func getLinkObjectsFromConfig(bondConf *bondingConfig, netNsHandle *netlink.Hand
 }
 
 // configure the bonded link & add it using the netNsHandle context to add it to the required namespace. return a bondLinkObj pointer & error
-func createBondedLink(bondName string, bondMode string, bondMiimon string, bondMTU int, failOverMac int, netNsHandle *netlink.Handle) (*netlink.Bond, error) {
+func createBondedLink(bondName string, bondConf *bondingConfig, netNsHandle *netlink.Handle) (*netlink.Bond, error) {
 	var err error
+
 	bondLinkObj := netlink.NewLinkBond(netlink.NewLinkAttrs())
-	bondModeObj := netlink.StringToBondMode(bondMode)
 	bondLinkObj.Attrs().Name = bondName
+
+	bondModeObj := netlink.StringToBondMode(bondConf.Mode)
 	bondLinkObj.Mode = bondModeObj
-	bondLinkObj.Miimon, err = strconv.Atoi(bondMiimon)
+
+	bondLinkObj.Miimon, err = strconv.Atoi(bondConf.Miimon)
 	if err != nil {
-		return nil, fmt.Errorf("failed to convert bondMiimon value (%+v) to an int, error: %+v", bondMiimon, err)
+		return nil, fmt.Errorf("failed to convert bondMiimon value (%+v) to an int, error: %+v", bondConf.Miimon, err)
 	}
-	if bondMTU != 0 {
-		bondLinkObj.MTU = bondMTU
+
+	if bondConf.MTU != 0 {
+		bondLinkObj.MTU = bondConf.MTU
 	}
-	bondLinkObj.FailOverMac = netlink.BondFailOverMac(failOverMac)
+
+	bondLinkObj.FailOverMac = netlink.BondFailOverMac(bondConf.FailOverMac)
+
+	if bondConf.AllSlavesActive != nil {
+		bondLinkObj.AllSlavesActive = *bondConf.AllSlavesActive
+	}
 
 	err = netNsHandle.LinkAdd(bondLinkObj)
 	if err != nil {
@@ -267,7 +283,7 @@ func createBond(bondName string, bondConf *bondingConfig, nspath string, ns ns.N
 	if bondConf.FailOverMac < 0 || bondConf.FailOverMac > 2 {
 		return nil, fmt.Errorf("FailOverMac mode should be 0, 1 or 2 actual: %+v", bondConf.FailOverMac)
 	}
-	bondLinkObj, err := createBondedLink(bondName, bondConf.Mode, bondConf.Miimon, bondConf.MTU, bondConf.FailOverMac, netNsHandle)
+	bondLinkObj, err := createBondedLink(bondName, bondConf, netNsHandle)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create bonded link (%+v), error: %+v", bondName, err)
 	}
