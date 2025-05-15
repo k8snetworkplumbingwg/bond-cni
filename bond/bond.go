@@ -29,9 +29,10 @@ import (
 	"github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ipam"
 	"github.com/containernetworking/plugins/pkg/ns"
-	"github.com/intel/bond-cni/bond/util"
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
+
+	"github.com/intel/bond-cni/bond/util"
 )
 
 type bondingConfig struct {
@@ -143,10 +144,15 @@ func createBondedLink(bondName string, bondConf *bondingConfig, netNsHandle *net
 
 // loop over the linkObjectsToBond, set each DOWN, update the interface MASTER & set it UP again.
 // again we use the netNsHandle to interfact with these links in the namespace provided. return error
-func attachLinksToBond(bondLinkObj *netlink.Bond, linkObjectsToBond []netlink.Link, netNsHandle *netlink.Handle) error {
-	err := util.HandleMacDuplicates(linkObjectsToBond, netNsHandle)
-	if err != nil {
-		return fmt.Errorf("failed to handle duplicated macs on link slaves, error: %+v", err)
+func attachLinksToBond(bondLinkObj *netlink.Bond, linkObjectsToBond []netlink.Link, mode string, netNsHandle *netlink.Handle) error {
+	var err error
+
+	bondMode := netlink.StringToBondMode(mode)
+	if bondMode == netlink.BOND_MODE_BALANCE_TLB || bondMode == netlink.BOND_MODE_BALANCE_ALB {
+		err = util.HandleMacDuplicates(linkObjectsToBond, netNsHandle)
+		if err != nil {
+			return fmt.Errorf("failed to handle duplicated macs on link slaves, error: %+v", err)
+		}
 	}
 
 	bondLinkIndex := bondLinkObj.Index
@@ -283,12 +289,13 @@ func createBond(bondName string, bondConf *bondingConfig, nspath string, ns ns.N
 	if bondConf.FailOverMac < 0 || bondConf.FailOverMac > 2 {
 		return nil, fmt.Errorf("FailOverMac mode should be 0, 1 or 2 actual: %+v", bondConf.FailOverMac)
 	}
+
 	bondLinkObj, err := createBondedLink(bondName, bondConf, netNsHandle)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create bonded link (%+v), error: %+v", bondName, err)
 	}
 
-	err = attachLinksToBond(bondLinkObj, linkObjectsToBond, netNsHandle)
+	err = attachLinksToBond(bondLinkObj, linkObjectsToBond, bondConf.Mode, netNsHandle)
 	if err != nil {
 		return nil, fmt.Errorf("failed to attached links to bond, error: %+v", err)
 	}
@@ -431,19 +438,6 @@ func cmdDel(args *skel.CmdArgs) error {
 
 	if err = deattachLinksFromBond(linkObjectsToDeattach, netNsHandle); err != nil {
 		return fmt.Errorf("failed to deattached links from bond, error: %+v", err)
-	}
-
-	// Fetch slave links again to have the latest state
-	// For instance, Active-backup mode with fail_over_mac=0 reverts the mac address of backup slaves
-	for i := range linkObjectsToDeattach {
-		linkObjectsToDeattach[i], err = netNsHandle.LinkByName(linkObjectsToDeattach[i].Attrs().Name)
-		if err != nil {
-			return fmt.Errorf("failed to find link (%+v), error: %+v", linkObjectsToDeattach[i].Attrs().Name, err)
-		}
-	}
-
-	if err = util.HandleMacDuplicates(linkObjectsToDeattach, netNsHandle); err != nil {
-		return fmt.Errorf("failed to validate deattached links macs, error: %+v", err)
 	}
 
 	err = netNsHandle.LinkDel(linkObjToDel)
