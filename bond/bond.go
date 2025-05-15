@@ -67,6 +67,11 @@ func loadConfigFile(bytes []byte) (*bondingConfig, string, error) {
 		return nil, "", fmt.Errorf("bond is not a suitable IPAM type")
 	}
 
+	bondMode := netlink.StringToBondMode(bondConf.Mode)
+	if bondMode == netlink.BOND_MODE_UNKNOWN {
+		return nil, "", fmt.Errorf("bonding mode (%+v) is not supported", bondConf.Mode)
+	}
+
 	if bondConf.AllSlavesActive != nil && *bondConf.AllSlavesActive != 0 && *bondConf.AllSlavesActive != 1 {
 		return nil, "", fmt.Errorf("allSlavesActive should be 0 or 1, actual: %+v", *bondConf.AllSlavesActive)
 	}
