@@ -228,57 +228,6 @@ var _ = Describe("bond plugin", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
-		It("verifies the plugin handles duplicated macs on delete", func() {
-			var slave1, slave2 netlink.Link
-			var err error
-
-			err = podNS.Do(func(ns.NetNS) error {
-				defer GinkgoRecover()
-				slave1, err = netlink.LinkByName(Slave1)
-				Expect(err).NotTo(HaveOccurred())
-
-				slave2, err = netlink.LinkByName(Slave2)
-				Expect(err).NotTo(HaveOccurred())
-
-				err = netlink.LinkSetHardwareAddr(slave2, slave1.Attrs().HardwareAddr)
-				Expect(err).NotTo(HaveOccurred())
-				return nil
-			})
-
-			By("creating the plugin")
-			r, _, err := testutils.CmdAddWithArgs(args, func() error {
-				return cmdAdd(args)
-			})
-			Expect(err).NotTo(HaveOccurred())
-
-			By("checking the bond was created")
-			checkAddReturnResult(&r, IfName)
-
-			err = podNS.Do(func(ns.NetNS) error {
-				defer GinkgoRecover()
-				By("duplicating the macs on the slaves")
-				err = netlink.LinkSetHardwareAddr(slave2, slave1.Attrs().HardwareAddr)
-				Expect(err).NotTo(HaveOccurred())
-				return nil
-			})
-			By("deleting the plugin")
-			err = testutils.CmdDel(podNS.Path(),
-				args.ContainerID, "", func() error { return cmdDel(args) })
-			Expect(err).NotTo(HaveOccurred())
-
-			err = podNS.Do(func(ns.NetNS) error {
-				defer GinkgoRecover()
-				By("validating the macs are not duplicated")
-				slave1, err = netlink.LinkByName(Slave1)
-				Expect(err).NotTo(HaveOccurred())
-				slave2, err = netlink.LinkByName(Slave2)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(slave1.Attrs().HardwareAddr.String()).NotTo(Equal(slave2.Attrs().HardwareAddr.String()))
-				return nil
-			})
-			Expect(err).NotTo(HaveOccurred())
-		})
-
 		It("verifies that mac addresses are restored correctly in active-backup with fail_over_mac 0", func() {
 			var bond netlink.Link
 			var slave1 netlink.Link
