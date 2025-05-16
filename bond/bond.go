@@ -70,6 +70,10 @@ func loadConfigFile(bytes []byte) (*bondingConfig, string, error) {
 		return nil, "", fmt.Errorf("bond is not a suitable IPAM type")
 	}
 
+	if bondConf.FailOverMac < 0 || bondConf.FailOverMac > 2 {
+		return nil, "", fmt.Errorf("FailOverMac mode should be 0, 1 or 2 actual: %+v", bondConf.FailOverMac)
+	}
+
 	if bondConf.AllSlavesActive != nil && *bondConf.AllSlavesActive != 0 && *bondConf.AllSlavesActive != 1 {
 		return nil, "", fmt.Errorf("allSlavesActive should be 0 or 1, actual: %+v", *bondConf.AllSlavesActive)
 	}
@@ -306,9 +310,6 @@ func createBond(bondName string, bondConf *bondingConfig, nspath string, ns ns.N
 		return nil, err
 	}
 
-	if bondConf.FailOverMac < 0 || bondConf.FailOverMac > 2 {
-		return nil, fmt.Errorf("FailOverMac mode should be 0, 1 or 2 actual: %+v", bondConf.FailOverMac)
-	}
 	bondLinkObj, err := createBondedLink(bondName, bondConf, netNsHandle)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create bonded link (%+v), error: %+v", bondName, err)
