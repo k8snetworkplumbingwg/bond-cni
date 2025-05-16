@@ -36,13 +36,16 @@ import (
 
 type bondingConfig struct {
 	types.NetConf
-	Mode            string                   `json:"mode"`
-	LinksContNs     bool                     `json:"linksInContainer"`
-	FailOverMac     int                      `json:"failOverMac"`
-	Miimon          string                   `json:"miimon"`
-	Links           []map[string]interface{} `json:"links"`
-	MTU             int                      `json:"mtu"`
-	AllSlavesActive *int                     `json:"allSlavesActive,omitempty"`
+	Mode        string                   `json:"mode"`
+	LinksContNs bool                     `json:"linksInContainer"`
+	FailOverMac int                      `json:"failOverMac"`
+	Miimon      string                   `json:"miimon"`
+	Links       []map[string]interface{} `json:"links"`
+	MTU         int                      `json:"mtu"`
+
+	AllSlavesActive *int    `json:"allSlavesActive,omitempty"`
+	TlbDynamicLb    *int    `json:"tlbDynamicLb,omitempty"`
+	XmitHashPolicy  *string `json:"xmitHashPolicy,omitempty"`
 }
 
 var (
@@ -67,8 +70,27 @@ func loadConfigFile(bytes []byte) (*bondingConfig, string, error) {
 		return nil, "", fmt.Errorf("bond is not a suitable IPAM type")
 	}
 
+	if bondConf.FailOverMac < 0 || bondConf.FailOverMac > 2 {
+		return nil, "", fmt.Errorf("FailOverMac mode should be 0, 1 or 2 actual: %+v", bondConf.FailOverMac)
+	}
+
 	if bondConf.AllSlavesActive != nil && *bondConf.AllSlavesActive != 0 && *bondConf.AllSlavesActive != 1 {
 		return nil, "", fmt.Errorf("allSlavesActive should be 0 or 1, actual: %+v", *bondConf.AllSlavesActive)
+	}
+
+	if bondConf.TlbDynamicLb != nil {
+		bondMode := netlink.StringToBondMode(bondConf.Mode)
+		if bondMode != netlink.BOND_MODE_BALANCE_TLB && bondMode != netlink.BOND_MODE_BALANCE_ALB {
+			return nil, "", fmt.Errorf("tlbDynamicLb is only supported in balance-tlb or balance-alb mode, actual: %+v", bondConf.Mode)
+		}
+
+		if *bondConf.TlbDynamicLb != 0 && *bondConf.TlbDynamicLb != 1 {
+			return nil, "", fmt.Errorf("tlbDynamicLb should be 0 or 1, actual: %+v", *bondConf.TlbDynamicLb)
+		}
+	}
+
+	if bondConf.XmitHashPolicy != nil && netlink.StringToBondXmitHashPolicy(*bondConf.XmitHashPolicy) == netlink.BOND_XMIT_HASH_POLICY_UNKNOWN {
+		return nil, "", fmt.Errorf("xmitHashPolicy is not supported, actual: %+v", *bondConf.XmitHashPolicy)
 	}
 
 	return bondConf, bondConf.CNIVersion, nil
@@ -131,6 +153,14 @@ func createBondedLink(bondName string, bondConf *bondingConfig, netNsHandle *net
 
 	if bondConf.AllSlavesActive != nil {
 		bondLinkObj.AllSlavesActive = *bondConf.AllSlavesActive
+	}
+
+	if bondConf.TlbDynamicLb != nil {
+		bondLinkObj.TlbDynamicLb = *bondConf.TlbDynamicLb
+	}
+
+	if bondConf.XmitHashPolicy != nil {
+		bondLinkObj.XmitHashPolicy = netlink.StringToBondXmitHashPolicy(*bondConf.XmitHashPolicy)
 	}
 
 	err = netNsHandle.LinkAdd(bondLinkObj)
@@ -280,9 +310,6 @@ func createBond(bondName string, bondConf *bondingConfig, nspath string, ns ns.N
 		return nil, err
 	}
 
-	if bondConf.FailOverMac < 0 || bondConf.FailOverMac > 2 {
-		return nil, fmt.Errorf("FailOverMac mode should be 0, 1 or 2 actual: %+v", bondConf.FailOverMac)
-	}
 	bondLinkObj, err := createBondedLink(bondName, bondConf, netNsHandle)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create bonded link (%+v), error: %+v", bondName, err)
