@@ -36,13 +36,15 @@ import (
 
 type bondingConfig struct {
 	types.NetConf
-	Mode            string                   `json:"mode"`
-	LinksContNs     bool                     `json:"linksInContainer"`
-	FailOverMac     int                      `json:"failOverMac"`
-	Miimon          string                   `json:"miimon"`
-	Links           []map[string]interface{} `json:"links"`
-	MTU             int                      `json:"mtu"`
-	AllSlavesActive *int                     `json:"allSlavesActive,omitempty"`
+	Mode        string                   `json:"mode"`
+	LinksContNs bool                     `json:"linksInContainer"`
+	FailOverMac int                      `json:"failOverMac"`
+	Miimon      string                   `json:"miimon"`
+	Links       []map[string]interface{} `json:"links"`
+	MTU         int                      `json:"mtu"`
+
+	AllSlavesActive *int `json:"allSlavesActive,omitempty"`
+	TlbDynamicLb    *int `json:"tlbDynamicLb,omitempty"`
 }
 
 var (
@@ -69,6 +71,17 @@ func loadConfigFile(bytes []byte) (*bondingConfig, string, error) {
 
 	if bondConf.AllSlavesActive != nil && *bondConf.AllSlavesActive != 0 && *bondConf.AllSlavesActive != 1 {
 		return nil, "", fmt.Errorf("allSlavesActive should be 0 or 1, actual: %+v", *bondConf.AllSlavesActive)
+	}
+
+	if bondConf.TlbDynamicLb != nil {
+		bondMode := netlink.StringToBondMode(bondConf.Mode)
+		if bondMode != netlink.BOND_MODE_BALANCE_TLB && bondMode != netlink.BOND_MODE_BALANCE_ALB {
+			return nil, "", fmt.Errorf("tlbDynamicLb is only supported in balance-tlb or balance-alb mode, actual: %+v", bondConf.Mode)
+		}
+
+		if *bondConf.TlbDynamicLb != 0 && *bondConf.TlbDynamicLb != 1 {
+			return nil, "", fmt.Errorf("tlbDynamicLb should be 0 or 1, actual: %+v", *bondConf.TlbDynamicLb)
+		}
 	}
 
 	return bondConf, bondConf.CNIVersion, nil
@@ -131,6 +144,10 @@ func createBondedLink(bondName string, bondConf *bondingConfig, netNsHandle *net
 
 	if bondConf.AllSlavesActive != nil {
 		bondLinkObj.AllSlavesActive = *bondConf.AllSlavesActive
+	}
+
+	if bondConf.TlbDynamicLb != nil {
+		bondLinkObj.TlbDynamicLb = *bondConf.TlbDynamicLb
 	}
 
 	err = netNsHandle.LinkAdd(bondLinkObj)
