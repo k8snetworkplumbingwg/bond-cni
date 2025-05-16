@@ -461,6 +461,7 @@ var _ = Describe("bond plugin", func() {
 				Expect(err).To(HaveOccurred())
 				return
 			}
+			Expect(err).NotTo(HaveOccurred())
 
 			By("validating the returned result is correct")
 			checkAddReturnResult(&r, IfName)
