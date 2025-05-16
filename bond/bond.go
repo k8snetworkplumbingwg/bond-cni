@@ -43,8 +43,9 @@ type bondingConfig struct {
 	Links       []map[string]interface{} `json:"links"`
 	MTU         int                      `json:"mtu"`
 
-	AllSlavesActive *int `json:"allSlavesActive,omitempty"`
-	TlbDynamicLb    *int `json:"tlbDynamicLb,omitempty"`
+	AllSlavesActive *int    `json:"allSlavesActive,omitempty"`
+	TlbDynamicLb    *int    `json:"tlbDynamicLb,omitempty"`
+	XmitHashPolicy  *string `json:"xmitHashPolicy,omitempty"`
 }
 
 var (
@@ -82,6 +83,10 @@ func loadConfigFile(bytes []byte) (*bondingConfig, string, error) {
 		if *bondConf.TlbDynamicLb != 0 && *bondConf.TlbDynamicLb != 1 {
 			return nil, "", fmt.Errorf("tlbDynamicLb should be 0 or 1, actual: %+v", *bondConf.TlbDynamicLb)
 		}
+	}
+
+	if bondConf.XmitHashPolicy != nil && netlink.StringToBondXmitHashPolicy(*bondConf.XmitHashPolicy) == netlink.BOND_XMIT_HASH_POLICY_UNKNOWN {
+		return nil, "", fmt.Errorf("xmitHashPolicy is not supported, actual: %+v", *bondConf.XmitHashPolicy)
 	}
 
 	return bondConf, bondConf.CNIVersion, nil
@@ -148,6 +153,10 @@ func createBondedLink(bondName string, bondConf *bondingConfig, netNsHandle *net
 
 	if bondConf.TlbDynamicLb != nil {
 		bondLinkObj.TlbDynamicLb = *bondConf.TlbDynamicLb
+	}
+
+	if bondConf.XmitHashPolicy != nil {
+		bondLinkObj.XmitHashPolicy = netlink.StringToBondXmitHashPolicy(*bondConf.XmitHashPolicy)
 	}
 
 	err = netNsHandle.LinkAdd(bondLinkObj)
