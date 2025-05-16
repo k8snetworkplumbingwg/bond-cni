@@ -485,6 +485,79 @@ var _ = Describe("bond plugin", func() {
 		)
 	})
 
+	When("xmit_hash_policy is added to the config", func() {
+		var config string
+
+		BeforeEach(func() {
+			var err error
+
+			config = `{
+			"name": "bond",
+			"type": "bond",
+			"cniVersion": "0.3.1",
+			"mode": "%s",
+			"failOverMac": 1,
+			"linksInContainer": true,
+			"miimon": "100",
+			"mtu": 1400,
+			"links": [
+				{"name": "net1"},
+				{"name": "net2"}
+			],
+            "xmitHashPolicy": "%s"
+		}`
+
+			linksInContainer = true
+			linkAttrs := []netlink.LinkAttrs{
+				{Name: Slave1},
+				{Name: Slave2},
+			}
+			podNS, err = testutils.NewNS()
+			Expect(err).NotTo(HaveOccurred())
+			addLinksInNS(podNS, linkAttrs)
+		})
+
+		DescribeTable("Verify xmit_hash_policy is properly set", func(xmitHashPolicy string) {
+			args := &skel.CmdArgs{
+				ContainerID: "dummy",
+				Netns:       podNS.Path(),
+				IfName:      IfName,
+				StdinData:   []byte(fmt.Sprintf(config, BalanceTlbMode, xmitHashPolicy)),
+			}
+			By("creating the plugin")
+			r, _, err := testutils.CmdAddWithArgs(args, func() error {
+				return cmdAdd(args)
+			})
+
+			if netlink.StringToBondXmitHashPolicy(xmitHashPolicy) == netlink.BOND_XMIT_HASH_POLICY_UNKNOWN {
+				Expect(err).To(HaveOccurred())
+				return
+			}
+			Expect(err).NotTo(HaveOccurred())
+
+			By("validating the returned result is correct")
+			checkAddReturnResult(&r, IfName)
+
+			Expect(err).To(Not(HaveOccurred()))
+
+			err = podNS.Do(func(ns.NetNS) error {
+				defer GinkgoRecover()
+				By("validating the bond interface is configured correctly")
+				link, err := netlink.LinkByName(IfName)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(link.(*netlink.Bond).XmitHashPolicy).To(Equal(netlink.StringToBondXmitHashPolicy(xmitHashPolicy)))
+				return nil
+			})
+			Expect(err).NotTo(HaveOccurred())
+		},
+			Entry("xmit_hash_policy is layer2", "layer2"),
+			Entry("xmit_hash_policy is layer2+3", "layer2+3"),
+			Entry("xmit_hash_policy is layer3+4", "layer3+4"),
+			Entry("xmit_hash_policy is layer2+3+4 (invalid)", "layer2+3+4"),
+		)
+	})
+
 	When("tlb_dynamic_lb is added to the config", func() {
 		var config string
 
