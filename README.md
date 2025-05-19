@@ -37,6 +37,7 @@ The binary should be placed at /opt/cni/bin on all nodes on which bonding will t
 - linksInContainer(boolean, optional): specifies if slave links are in container to start. Default is false i.e. look for interfaces on host before bonding.
 - links (dictionary, required): master interface names
 - ipam (dictionary, required): IPAM configuration to be used for this network
+- allSlavesActive (int, optional): specifies that duplicate frames received on inactive ports should be dropped (0) or delivered (1). Default is 0.
 
 ## Usage
 
