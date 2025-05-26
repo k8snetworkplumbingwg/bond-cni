@@ -70,6 +70,11 @@ func loadConfigFile(bytes []byte) (*bondingConfig, string, error) {
 		return nil, "", fmt.Errorf("bond is not a suitable IPAM type")
 	}
 
+	bondMode := netlink.StringToBondMode(bondConf.Mode)
+	if bondMode == netlink.BOND_MODE_UNKNOWN {
+		return nil, "", fmt.Errorf("bonding mode (%+v) is not supported", bondConf.Mode)
+	}
+
 	if bondConf.FailOverMac < 0 || bondConf.FailOverMac > 2 {
 		return nil, "", fmt.Errorf("FailOverMac mode should be 0, 1 or 2 actual: %+v", bondConf.FailOverMac)
 	}
@@ -79,7 +84,6 @@ func loadConfigFile(bytes []byte) (*bondingConfig, string, error) {
 	}
 
 	if bondConf.TlbDynamicLb != nil {
-		bondMode := netlink.StringToBondMode(bondConf.Mode)
 		if bondMode != netlink.BOND_MODE_BALANCE_TLB && bondMode != netlink.BOND_MODE_BALANCE_ALB {
 			return nil, "", fmt.Errorf("tlbDynamicLb is only supported in balance-tlb or balance-alb mode, actual: %+v", bondConf.Mode)
 		}
