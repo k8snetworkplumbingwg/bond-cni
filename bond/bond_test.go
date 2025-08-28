@@ -24,6 +24,7 @@ import (
 	types040 "github.com/containernetworking/cni/pkg/types/040"
 	types100 "github.com/containernetworking/cni/pkg/types/100"
 
+	"github.com/containernetworking/plugins/pkg/netlinksafe"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/containernetworking/plugins/pkg/testutils"
 	. "github.com/onsi/ginkgo/v2"
@@ -102,7 +103,7 @@ var _ = Describe("bond plugin", func() {
 			err = podNS.Do(func(ns.NetNS) error {
 				defer GinkgoRecover()
 				By("validating the bond interface is configured correctly")
-				link, err := netlink.LinkByName(IfName)
+				link, err := netlinksafe.LinkByName(IfName)
 				Expect(err).NotTo(HaveOccurred())
 				validateBondIFConf(link, DefaultMTU, ActiveBackupMode, 100)
 
@@ -119,7 +120,7 @@ var _ = Describe("bond plugin", func() {
 
 			err = podNS.Do(func(ns.NetNS) error {
 				defer GinkgoRecover()
-				_, err = netlink.LinkByName(IfName)
+				_, err = netlinksafe.LinkByName(IfName)
 				Expect(err).To(HaveOccurred())
 				return nil
 			})
@@ -142,7 +143,6 @@ var _ = Describe("bond plugin", func() {
 			err = testutils.CmdDel(podNS.Path(),
 				args.ContainerID, "", func() error { return cmdDel(args) })
 			Expect(err).NotTo(HaveOccurred())
-
 		})
 
 		It("verifies the del command does not fail when a device (in container) assigned to the bond has been deleted", func() {
@@ -156,7 +156,7 @@ var _ = Describe("bond plugin", func() {
 				defer GinkgoRecover()
 
 				By("deleting a slave interface")
-				slave, err := netlink.LinkByName(Slave1)
+				slave, err := netlinksafe.LinkByName(Slave1)
 				Expect(err).NotTo(HaveOccurred())
 				err = netlink.LinkDel(slave)
 				Expect(err).NotTo(HaveOccurred())
@@ -169,11 +169,9 @@ var _ = Describe("bond plugin", func() {
 			err = testutils.CmdDel(podNS.Path(),
 				args.ContainerID, "", func() error { return cmdDel(args) })
 			Expect(err).NotTo(HaveOccurred())
-
 		})
 
 		DescribeTable("verifies the plugin returns correct results for supported tested versions", func(version string) {
-
 			args.StdinData = []byte(fmt.Sprintf(config, version, ActiveBackupMode, 1, strconv.FormatBool(linksInContainer), strconv.Itoa(DefaultMTU)))
 
 			By(fmt.Sprintf("creating the plugin with config in version %s", version))
@@ -204,10 +202,10 @@ var _ = Describe("bond plugin", func() {
 			err := podNS.Do(func(ns.NetNS) error {
 				defer GinkgoRecover()
 
-				slave1, err := netlink.LinkByName(Slave1)
+				slave1, err := netlinksafe.LinkByName(Slave1)
 				Expect(err).NotTo(HaveOccurred())
 
-				slave2, err := netlink.LinkByName(Slave2)
+				slave2, err := netlinksafe.LinkByName(Slave2)
 				Expect(err).NotTo(HaveOccurred())
 
 				err = netlink.LinkSetHardwareAddr(slave2, slave1.Attrs().HardwareAddr)
@@ -234,10 +232,10 @@ var _ = Describe("bond plugin", func() {
 
 			err = podNS.Do(func(ns.NetNS) error {
 				defer GinkgoRecover()
-				slave1, err = netlink.LinkByName(Slave1)
+				slave1, err = netlinksafe.LinkByName(Slave1)
 				Expect(err).NotTo(HaveOccurred())
 
-				slave2, err = netlink.LinkByName(Slave2)
+				slave2, err = netlinksafe.LinkByName(Slave2)
 				Expect(err).NotTo(HaveOccurred())
 
 				err = netlink.LinkSetHardwareAddr(slave2, slave1.Attrs().HardwareAddr)
@@ -269,9 +267,9 @@ var _ = Describe("bond plugin", func() {
 			err = podNS.Do(func(ns.NetNS) error {
 				defer GinkgoRecover()
 				By("validating the macs are not duplicated")
-				slave1, err = netlink.LinkByName(Slave1)
+				slave1, err = netlinksafe.LinkByName(Slave1)
 				Expect(err).NotTo(HaveOccurred())
-				slave2, err = netlink.LinkByName(Slave2)
+				slave2, err = netlinksafe.LinkByName(Slave2)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(slave1.Attrs().HardwareAddr.String()).NotTo(Equal(slave2.Attrs().HardwareAddr.String()))
 				return nil
@@ -288,10 +286,10 @@ var _ = Describe("bond plugin", func() {
 			By("storing mac addresses of slaves")
 			err = podNS.Do(func(ns.NetNS) error {
 				defer GinkgoRecover()
-				slave1, err = netlink.LinkByName(Slave1)
+				slave1, err = netlinksafe.LinkByName(Slave1)
 				Expect(err).NotTo(HaveOccurred())
 
-				slave2, err = netlink.LinkByName(Slave2)
+				slave2, err = netlinksafe.LinkByName(Slave2)
 				Expect(err).NotTo(HaveOccurred())
 
 				return nil
@@ -319,13 +317,13 @@ var _ = Describe("bond plugin", func() {
 
 			err = podNS.Do(func(ns.NetNS) error {
 				defer GinkgoRecover()
-				bond, err = netlink.LinkByName(IfName)
+				bond, err = netlinksafe.LinkByName(IfName)
 				Expect(err).NotTo(HaveOccurred())
 
-				slave1, err = netlink.LinkByName(Slave1)
+				slave1, err = netlinksafe.LinkByName(Slave1)
 				Expect(err).NotTo(HaveOccurred())
 
-				slave2, err = netlink.LinkByName(Slave2)
+				slave2, err = netlinksafe.LinkByName(Slave2)
 				Expect(err).NotTo(HaveOccurred())
 
 				return nil
@@ -344,13 +342,13 @@ var _ = Describe("bond plugin", func() {
 			err = podNS.Do(func(ns.NetNS) error {
 				defer GinkgoRecover()
 
-				_, err = netlink.LinkByName(IfName)
+				_, err = netlinksafe.LinkByName(IfName)
 				Expect(err).To(HaveOccurred())
 
-				slave1, err = netlink.LinkByName(Slave1)
+				slave1, err = netlinksafe.LinkByName(Slave1)
 				Expect(err).NotTo(HaveOccurred())
 
-				slave2, err = netlink.LinkByName(Slave2)
+				slave2, err = netlinksafe.LinkByName(Slave2)
 				Expect(err).NotTo(HaveOccurred())
 
 				return nil
@@ -471,7 +469,7 @@ var _ = Describe("bond plugin", func() {
 			err = podNS.Do(func(ns.NetNS) error {
 				defer GinkgoRecover()
 				By("validating the bond interface is configured correctly")
-				link, err := netlink.LinkByName(IfName)
+				link, err := netlinksafe.LinkByName(IfName)
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(link.(*netlink.Bond).AllSlavesActive).To(Equal(allSlavesActive))
@@ -543,7 +541,7 @@ var _ = Describe("bond plugin", func() {
 			err = podNS.Do(func(ns.NetNS) error {
 				defer GinkgoRecover()
 				By("validating the bond interface is configured correctly")
-				link, err := netlink.LinkByName(IfName)
+				link, err := netlinksafe.LinkByName(IfName)
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(link.(*netlink.Bond).XmitHashPolicy).To(Equal(netlink.StringToBondXmitHashPolicy(xmitHashPolicy)))
@@ -616,7 +614,7 @@ var _ = Describe("bond plugin", func() {
 			err = podNS.Do(func(ns.NetNS) error {
 				defer GinkgoRecover()
 				By("validating the bond interface is configured correctly")
-				link, err := netlink.LinkByName(IfName)
+				link, err := netlinksafe.LinkByName(IfName)
 				Expect(err).NotTo(HaveOccurred())
 
 				Expect(link.(*netlink.Bond).TlbDynamicLb).To(Equal(tlbDynamicLb))
@@ -704,7 +702,7 @@ var _ = Describe("bond plugin", func() {
 			err = podNS.Do(func(ns.NetNS) error {
 				defer GinkgoRecover()
 				By("validating the bond interface is configured correctly")
-				link, err := netlink.LinkByName(IfName)
+				link, err := netlinksafe.LinkByName(IfName)
 				Expect(err).NotTo(HaveOccurred())
 				validateBondIFConf(link, DefaultMTU, ActiveBackupMode, 100)
 
@@ -729,7 +727,7 @@ var _ = Describe("bond plugin", func() {
 			err = podNS.Do(func(ns.NetNS) error {
 				defer GinkgoRecover()
 				for _, slaveName := range Slaves {
-					_, err := netlink.LinkByName(slaveName)
+					_, err := netlinksafe.LinkByName(slaveName)
 					Expect(err).To(HaveOccurred())
 				}
 				return nil
@@ -739,13 +737,12 @@ var _ = Describe("bond plugin", func() {
 			err = initNS.Do(func(ns.NetNS) error {
 				By("Checking that links are in initial namespace")
 				for _, slaveName := range Slaves {
-					_, err := netlink.LinkByName(slaveName)
+					_, err := netlinksafe.LinkByName(slaveName)
 					Expect(err).NotTo(HaveOccurred())
 				}
 				return nil
 			})
 			Expect(err).NotTo(HaveOccurred())
-
 		})
 	})
 })
@@ -791,7 +788,7 @@ func validateBondIFConf(link netlink.Link, expectedMTU int, expectedMode string,
 func validateBondSlavesConf(link netlink.Link, slaves []string) {
 	bond := link.(*netlink.Bond)
 	for _, slaveName := range slaves {
-		slave, err := netlink.LinkByName(slaveName)
+		slave, err := netlinksafe.LinkByName(slaveName)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(slave.Attrs().Slave).NotTo(BeNil())
 		Expect(slave.Attrs().MasterIndex).To(Equal(bond.Attrs().Index))
