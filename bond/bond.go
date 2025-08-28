@@ -28,6 +28,7 @@ import (
 	current "github.com/containernetworking/cni/pkg/types/100"
 	"github.com/containernetworking/cni/pkg/version"
 	"github.com/containernetworking/plugins/pkg/ipam"
+	"github.com/containernetworking/plugins/pkg/netlinksafe"
 	"github.com/containernetworking/plugins/pkg/ns"
 	"github.com/intel/bond-cni/bond/util"
 	"github.com/vishvananda/netlink"
@@ -48,9 +49,7 @@ type bondingConfig struct {
 	XmitHashPolicy  *string `json:"xmitHashPolicy,omitempty"`
 }
 
-var (
-	bondCni = "bond"
-)
+var bondCni = "bond"
 
 func init() {
 	// this ensures that main runs only on main thread (thread group leader).
@@ -101,7 +100,7 @@ func loadConfigFile(bytes []byte) (*bondingConfig, string, error) {
 }
 
 // retrieve the link names from the bondConf & check they exist. return an array of linkObjectsToBond & error
-func getLinkObjectsFromConfig(bondConf *bondingConfig, netNsHandle *netlink.Handle, releaseLinks bool) ([]netlink.Link, error) {
+func getLinkObjectsFromConfig(bondConf *bondingConfig, netNsHandle *netlinksafe.Handle, releaseLinks bool) ([]netlink.Link, error) {
 	linkNames := []string{}
 	for _, linkName := range bondConf.Links {
 		s, ok := linkName["name"].(string)
@@ -135,7 +134,7 @@ func getLinkObjectsFromConfig(bondConf *bondingConfig, netNsHandle *netlink.Hand
 }
 
 // configure the bonded link & add it using the netNsHandle context to add it to the required namespace. return a bondLinkObj pointer & error
-func createBondedLink(bondName string, bondConf *bondingConfig, netNsHandle *netlink.Handle) (*netlink.Bond, error) {
+func createBondedLink(bondName string, bondConf *bondingConfig, netNsHandle *netlinksafe.Handle) (*netlink.Bond, error) {
 	var err error
 
 	bondLinkObj := netlink.NewLinkBond(netlink.NewLinkAttrs())
@@ -177,7 +176,7 @@ func createBondedLink(bondName string, bondConf *bondingConfig, netNsHandle *net
 
 // loop over the linkObjectsToBond, set each DOWN, update the interface MASTER & set it UP again.
 // again we use the netNsHandle to interfact with these links in the namespace provided. return error
-func attachLinksToBond(bondLinkObj *netlink.Bond, linkObjectsToBond []netlink.Link, netNsHandle *netlink.Handle) error {
+func attachLinksToBond(bondLinkObj *netlink.Bond, linkObjectsToBond []netlink.Link, netNsHandle *netlinksafe.Handle) error {
 	err := util.HandleMacDuplicates(linkObjectsToBond, netNsHandle)
 	if err != nil {
 		return fmt.Errorf("failed to handle duplicated macs on link slaves, error: %+v", err)
@@ -203,7 +202,7 @@ func attachLinksToBond(bondLinkObj *netlink.Bond, linkObjectsToBond []netlink.Li
 
 // loop over the linkObjectsToDeattach, set each DOWN, update the interface MASTER to nomaster & set it UP again.
 // again we use the netNsHandle to interfact with these links in the namespace provided. return error
-func deattachLinksFromBond(linkObjectsToDeattach []netlink.Link, netNsHandle *netlink.Handle) error {
+func deattachLinksFromBond(linkObjectsToDeattach []netlink.Link, netNsHandle *netlinksafe.Handle) error {
 	var err error
 
 	for _, linkObject := range linkObjectsToDeattach {
@@ -292,7 +291,7 @@ func createBond(bondName string, bondConf *bondingConfig, nspath string, ns ns.N
 	}()
 
 	// get a handle for the namespace above, this handle will be used to interact with existing links and add a new one
-	netNsHandle, err := netlink.NewHandleAt(netNs)
+	netNsHandle, err := netlinksafe.NewHandleAt(netNs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a new handle at netNs (%+v), error: %+v", netNs, err)
 	}
@@ -304,7 +303,7 @@ func createBond(bondName string, bondConf *bondingConfig, nspath string, ns ns.N
 		}
 	}
 
-	linkObjectsToBond, err := getLinkObjectsFromConfig(bondConf, netNsHandle, false)
+	linkObjectsToBond, err := getLinkObjectsFromConfig(bondConf, &netNsHandle, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve link objects from configuration file (%+v), error: %+v", bondConf, err)
 	}
@@ -314,12 +313,12 @@ func createBond(bondName string, bondConf *bondingConfig, nspath string, ns ns.N
 		return nil, err
 	}
 
-	bondLinkObj, err := createBondedLink(bondName, bondConf, netNsHandle)
+	bondLinkObj, err := createBondedLink(bondName, bondConf, &netNsHandle)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create bonded link (%+v), error: %+v", bondName, err)
 	}
 
-	err = attachLinksToBond(bondLinkObj, linkObjectsToBond, netNsHandle)
+	err = attachLinksToBond(bondLinkObj, linkObjectsToBond, &netNsHandle)
 	if err != nil {
 		return nil, fmt.Errorf("failed to attached links to bond, error: %+v", err)
 	}
@@ -339,7 +338,6 @@ func createBond(bondName string, bondConf *bondingConfig, nspath string, ns ns.N
 	bond.Sandbox = ns.Path()
 
 	return bond, nil
-
 }
 
 func cmdAdd(args *skel.CmdArgs) error {
@@ -404,7 +402,6 @@ func cmdAdd(args *skel.CmdArgs) error {
 	}
 
 	return types.PrintResult(result, cniVersion)
-
 }
 
 func cmdDel(args *skel.CmdArgs) error {
@@ -435,7 +432,7 @@ func cmdDel(args *skel.CmdArgs) error {
 		_ = netNs.Close()
 	}()
 	// get a handle for the namespace above, this handle will be used to interact with existing links and add a new one
-	netNsHandle, err := netlink.NewHandleAt(netNs)
+	netNsHandle, err := netlinksafe.NewHandleAt(netNs)
 	if err != nil {
 		return fmt.Errorf("failed to create a new handle at netNs (%+v), error: %+v", netNs, err)
 	}
@@ -450,7 +447,7 @@ func cmdDel(args *skel.CmdArgs) error {
 		return fmt.Errorf("failed to find bonded link (%+v), error: %+v", bondConf.Name, err)
 	}
 
-	linkObjectsToDeattach, err := getLinkObjectsFromConfig(bondConf, netNsHandle, true)
+	linkObjectsToDeattach, err := getLinkObjectsFromConfig(bondConf, &netNsHandle, true)
 	if err != nil {
 		return fmt.Errorf("failed to retrieve link objects from configuration file (%+v), error: %+v", bondConf, err)
 	}
@@ -460,7 +457,7 @@ func cmdDel(args *skel.CmdArgs) error {
 		return fmt.Errorf("failed to set bonded link: %+v DOWN, error: %+v", linkObjToDel.Attrs().Name, err)
 	}
 
-	if err = deattachLinksFromBond(linkObjectsToDeattach, netNsHandle); err != nil {
+	if err = deattachLinksFromBond(linkObjectsToDeattach, &netNsHandle); err != nil {
 		return fmt.Errorf("failed to deattached links from bond, error: %+v", err)
 	}
 
@@ -473,7 +470,7 @@ func cmdDel(args *skel.CmdArgs) error {
 		}
 	}
 
-	if err = util.HandleMacDuplicates(linkObjectsToDeattach, netNsHandle); err != nil {
+	if err = util.HandleMacDuplicates(linkObjectsToDeattach, &netNsHandle); err != nil {
 		return fmt.Errorf("failed to validate deattached links macs, error: %+v", err)
 	}
 
@@ -490,6 +487,7 @@ func cmdDel(args *skel.CmdArgs) error {
 
 	return err
 }
+
 func cmdCheck(args *skel.CmdArgs) error {
 	return nil
 }
