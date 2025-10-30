@@ -1,12 +1,10 @@
 module github.com/intel/bond-cni
 
-go 1.23.0
-
-toolchain go1.24.1
+go 1.24.2
 
 require (
 	github.com/containernetworking/cni v1.3.0
-	github.com/containernetworking/plugins v1.7.1
+	github.com/containernetworking/plugins v1.8.0
 	github.com/onsi/ginkgo/v2 v2.27.1
 	github.com/onsi/gomega v1.38.2
 	github.com/vishvananda/netlink v1.3.1
@@ -19,9 +17,9 @@ require (
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-task/slim-sprig/v3 v3.0.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/pprof v0.0.0-20250403155104-27863c87afa6 // indirect
+	github.com/google/pprof v0.0.0-20250820193118-f64d9cf942d6 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/safchain/ethtool v0.5.10 // indirect
+	github.com/safchain/ethtool v0.6.2 // indirect
 	go.uber.org/automaxprocs v1.6.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/mod v0.27.0 // indirect
