@@ -36,8 +36,7 @@ $(BASE): ; $(info  Setting GOPATH...)
 
 
 deps-update:
-	go mod tidy && \
-	go mod vendor
+	go mod tidy
 
 gofmt:
 	@echo "Running gofmt"

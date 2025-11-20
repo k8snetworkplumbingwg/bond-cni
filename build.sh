@@ -18,4 +18,4 @@
 set -e
 
 echo "Building bond-cni plugins"
-go build --mod=vendor -o ./bin/bond ./bond/
+go build -o ./bin/bond ./bond/
