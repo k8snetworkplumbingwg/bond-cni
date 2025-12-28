@@ -41,6 +41,8 @@ jobs:
           go-version-file: go.mod
 
       - name: Test
+        env:
+          GOTOOLCHAIN: auto
         run: make test
 
   coverage:
