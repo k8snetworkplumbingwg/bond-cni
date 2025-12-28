@@ -30,9 +30,10 @@ import (
 	"github.com/containernetworking/plugins/pkg/ipam"
 	"github.com/containernetworking/plugins/pkg/netlinksafe"
 	"github.com/containernetworking/plugins/pkg/ns"
-	"github.com/intel/bond-cni/bond/util"
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
+
+	"github.com/intel/bond-cni/bond/util"
 )
 
 type bondingConfig struct {
@@ -398,7 +399,6 @@ func cmdAdd(args *skel.CmdArgs) error {
 		}
 
 		result.DNS = bondConf.DNS
-
 	}
 
 	return types.PrintResult(result, cniVersion)

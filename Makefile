@@ -2,15 +2,24 @@
 # Go environment:
 GOPATH=$(CURDIR)/.gopath
 GOBIN=$(CURDIR)/bin
+# Allow Go to download toolchain if needed
+GOTOOLCHAIN?=auto
 
 export GOPATH
 export GOBIN
+export GOTOOLCHAIN
 
 # Go tools:
 GOCOVXML = $(GOBIN)/gocov-xml
 GOCOVMERGE = $(GOBIN)/gocovmerge
 GOCOV = $(GOBIN)/gocov
 GCOV2LCOV = $(GOBIN)/gcov2lcov
+GOLANGCI_LINT = $(GOBIN)/golangci-lint
+
+# golangci-lint version should be updated periodically
+# we keep it fixed to avoid it from unexpectedly failing on the project
+# in case of a version bump
+GOLANGCI_LINT_VER = v2.7.2
 
 # Package info
 PACKAGE=bond-cni
@@ -46,7 +55,7 @@ build-bin:
 	./build.sh
 
 test: build-bin # Tests need sudo due to network interfaces creation
-	sudo -E bash -c "umask 0; PATH=${GOPATH}/bin:$(pwd)/bin:${PATH} go test -race ./bond/"
+	sudo -E bash -c "umask 0; unset GOTOOLCHAIN; PATH=${GOPATH}/bin:$(pwd)/bin:${PATH} go test -race ./bond/"
 
 
 # tool that takes the results from multiple go test -coverprofile runs and merges them into one profile
@@ -83,3 +92,12 @@ test-coverage: test-coverage-tools | $(BASE) ; $(info  Running coverage tests...
 	go tool cover -html=$(COVERAGE_PROFILE) -o $(COVERAGE_HTML)
 	$(GOCOV) convert $(COVERAGE_PROFILE) | $(GOCOVXML) > $(COVERAGE_XML)
 	$(GCOV2LCOV) -infile $(COVERAGE_PROFILE) -outfile $(COVERAGE_DIR)/lcov.info
+
+# golangci-lint tool
+$(GOLANGCI_LINT): ; $(info  installing golangci-lint...)
+	GOBIN=$(GOBIN) go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VER)
+
+.PHONY: lint
+lint: | $(GOLANGCI_LINT) ; $(info  running golangci-lint...) @ ## Run golangci-lint
+	$(GOLANGCI_LINT) run --timeout=10m
+
