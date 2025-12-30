@@ -11,7 +11,7 @@ jobs:
       - name: setup go
         uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: 1.25.x
 
       - uses: golangci/golangci-lint-action@v9
         with:
@@ -25,7 +25,7 @@ jobs:
       - name: set up Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: 1.25.x
 
       - name: Build
         run: make build-bin
@@ -38,7 +38,7 @@ jobs:
       - name: setup go
         uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: 1.25.x
 
       - name: Test
         run: make test
@@ -52,7 +52,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: go.mod
+          go-version: 1.25.x
 
       - name: Go test with coverage
         run: sudo make test-coverage # sudo needed for network interfaces creation
