@@ -2,6 +2,9 @@ name: build
 
 on: ["push", "pull_request"]
 
+permissions:
+  contents: read
+
 jobs:
   lint:
     name: Lint
@@ -30,37 +33,22 @@ jobs:
       - name: Build
         run: make build-bin
 
-  test:
-    name: test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - name: setup go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
-
-      - name: Test
-        env:
-          GOTOOLCHAIN: auto
-        run: make test
-
-  coverage:
+  unit-test:
     runs-on: ubuntu-latest
     needs: build
-    name: coverage
+    name: unit-test
+    container:
+      image: golang:1.25
+      options: --privileged
     steps:
       - uses: actions/checkout@v6
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: go.mod
 
       - name: Go test with coverage
-        run: sudo env PATH="$PATH" make test-coverage # sudo needed for network interfaces creation
+        run: go test -race -covermode=atomic -coverprofile=profile.out ./bond/ -v --ginkgo.v
 
       - name: Coveralls
         uses: coverallsapp/github-action@v2
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          path-to-lcov: test/coverage/lcov.info
+          file: profile.out
+          format: golang
