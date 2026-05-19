@@ -57,7 +57,7 @@ jobs:
           go-version-file: go.mod
 
       - name: Go test with coverage
-        run: sudo make test-coverage # sudo needed for network interfaces creation
+        run: sudo env PATH="$PATH" make test-coverage # sudo needed for network interfaces creation
 
       - name: Coveralls
         uses: coverallsapp/github-action@v2
