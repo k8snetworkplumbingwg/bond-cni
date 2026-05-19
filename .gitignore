@@ -2,3 +2,6 @@ bin/
 /test/coverage*
 /.gopath/*
 .idea/
+clab-bond-cni-e2e/
+profile.out
+.gomodcache/
