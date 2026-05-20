@@ -44,7 +44,7 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Go test with coverage
-        run: go test -race -covermode=atomic -coverprofile=profile.out ./bond/ -v --ginkgo.v
+        run: go test -race -covermode=atomic -coverprofile=profile.out ./... -v --ginkgo.v
 
       - name: Coveralls
         uses: coverallsapp/github-action@v2

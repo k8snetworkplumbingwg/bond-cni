@@ -9,7 +9,7 @@ topology:
     k01-worker:
       kind: ext-container
       exec:
-        - curl -Lo /tmp/cni.tgz https://github.com/containernetworking/plugins/releases/download/v1.4.0/cni-plugins-linux-amd64-v1.4.0.tgz
+        - curl -Lo /tmp/cni.tgz https://github.com/containernetworking/plugins/releases/download/v1.9.1/cni-plugins-linux-amd64-v1.9.1.tgz
         - tar -xzf /tmp/cni.tgz -C /opt/cni/bin
 
     sw:

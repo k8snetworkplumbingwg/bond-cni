@@ -1,0 +1,40 @@
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: bond-mode2-layer2
+spec:
+  config: |
+    {
+      "cniVersion": "1.1.0",
+      "type": "bond",
+      "ifname": "bond0",
+      "mode": "balance-xor",
+      "xmitHashPolicy": "layer2",
+      "miimon": "100",
+      "mtu": 1300,
+      "linksInContainer": true,
+      "links": [
+        {"name": "net1"},
+        {"name": "net2"}
+      ]
+    }
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bond-mode2-layer2
+  labels:
+    app: bond-mode2-layer2
+  annotations:
+    k8s.v1.cni.cncf.io/networks: |
+      [
+        {"name": "slave-one",        "interface": "net1"},
+        {"name": "slave-two",        "interface": "net2"},
+        {"name": "bond-mode2-layer2", "interface": "bond0"}
+      ]
+spec:
+  containers:
+  - name: bond-mode2-layer2
+    image: alpine:3.19
+    command: ["sleep", "infinity"]
