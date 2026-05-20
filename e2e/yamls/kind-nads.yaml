@@ -1,0 +1,26 @@
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: slave-one
+spec:
+  config: |
+    {
+      "cniVersion": "1.1.0",
+      "type": "macvlan",
+      "master": "eth1",
+      "mode": "bridge"
+    }
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: slave-two
+spec:
+  config: |
+    {
+      "cniVersion": "1.1.0",
+      "type": "macvlan",
+      "master": "eth2",
+      "mode": "bridge"
+    }

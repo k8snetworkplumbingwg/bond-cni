@@ -29,7 +29,7 @@ jobs:
       - name: Deploy stack
         run: |
           kubectl -n kube-system wait --for=condition=available deploy/coredns --timeout=300s
-          kubectl create -f clab/multus-daemonset-thick.yml
+          kubectl apply -f https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/v4.3.0/deployments/multus-daemonset-thick.yml
           kubectl -n kube-system wait --for=condition=ready -l name=multus pod --timeout=300s
           kubectl create -f clab/bond-cni-install.yml
           kubectl -n kube-system wait --for=condition=complete job/bond-cni-install --timeout=300s
