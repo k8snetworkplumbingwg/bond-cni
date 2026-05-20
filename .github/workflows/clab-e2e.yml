@@ -1,0 +1,57 @@
+name: e2e-clab
+on: [push, pull_request]
+
+permissions:
+  contents: read
+
+jobs:
+  e2e-clab:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Deploy topology
+        run: |
+          curl -sL https://get.containerlab.dev | sudo bash
+          sudo containerlab deploy -t clab/topo.yaml
+          kind export kubeconfig --name k01
+
+      - name: Build bond-cni image
+        run: |
+          docker build -t bond-cni:e2e -f images/Dockerfile .
+          kind load docker-image bond-cni:e2e --name k01
+
+      - name: Deploy stack
+        run: |
+          kubectl -n kube-system wait --for=condition=available deploy/coredns --timeout=300s
+          kubectl create -f clab/multus-daemonset-thick.yml
+          kubectl -n kube-system wait --for=condition=ready -l name=multus pod --timeout=300s
+          kubectl create -f clab/bond-cni-install.yml
+          kubectl -n kube-system wait --for=condition=complete job/bond-cni-install --timeout=300s
+
+      - name: Test
+        run: go test -tags e2e ./e2e/ -v -ginkgo.v -timeout 600s --ginkgo.junit-report=e2e-report.xml
+
+      - name: Export kind logs
+        if: always()
+        run: |
+          mkdir -p /tmp/kind-logs
+          kind export logs --name k01 /tmp/kind-logs
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-artifacts-${{ github.run_id }}
+          path: |
+            e2e-report.xml
+            /tmp/kind-logs
+
+      - name: Teardown
+        if: always()
+        run: sudo containerlab destroy -t clab/topo.yaml
