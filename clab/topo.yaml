@@ -1,0 +1,28 @@
+name: bond-cni-e2e
+
+topology:
+  nodes:
+    k01:
+      kind: k8s-kind
+      startup-config: kind-cluster.yaml
+
+    k01-worker:
+      kind: ext-container
+      exec:
+        - curl -Lo /tmp/cni.tgz https://github.com/containernetworking/plugins/releases/download/v1.4.0/cni-plugins-linux-amd64-v1.4.0.tgz
+        - tar -xzf /tmp/cni.tgz -C /opt/cni/bin
+
+    sw:
+      kind: linux
+      image: ghcr.io/srl-labs/network-multitool:v0.6.0
+      entrypoint: sleep
+      cmd: infinity
+      exec:
+        - ip link add br0 type bridge
+        - ip link set br0 up
+        - ip link set eth1 master br0
+        - ip link set eth2 master br0
+
+  links:
+    - endpoints: ["k01-worker:eth1", "sw:eth1"]
+    - endpoints: ["k01-worker:eth2", "sw:eth2"]

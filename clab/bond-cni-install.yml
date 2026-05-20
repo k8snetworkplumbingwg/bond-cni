@@ -1,0 +1,27 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: bond-cni-install
+  namespace: kube-system
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      tolerations:
+      - operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: bond-cni-plugin
+        image: bond-cni:e2e
+        imagePullPolicy: Never
+        env:
+        - name: SLEEP
+          value: "false"
+        volumeMounts:
+        - name: cnibin
+          mountPath: /host/opt/cni/bin/
+      volumes:
+      - name: cnibin
+        hostPath:
+          path: /opt/cni/bin/
