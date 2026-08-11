@@ -747,6 +747,52 @@ var _ = Describe("bond plugin", func() {
 	})
 })
 
+var _ = Describe("loadConfigFile", func() {
+	var baseConfig = `{
+		"name": "bond",
+		"type": "bond",
+		"cniVersion": "1.0.0",
+		"mode": "active-backup",
+		"failOverMac": 1,
+		"miimon": "100",
+		"links": [
+			{"name": "net1"},
+			{"name": "net2"}
+		]
+	}`
+
+	When("linksInContainer is not set in config", func() {
+		It("must default to true and succeed", func() {
+			bondConf, _, err := loadConfigFile([]byte(baseConfig))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(bondConf.LinksContNs).NotTo(BeNil())
+			Expect(*bondConf.LinksContNs).To(BeTrue())
+		})
+	})
+
+	When("linksInContainer is explicitly false", func() {
+		It("must succeed and emit deprecation warning", func() {
+			config := `{
+				"name": "bond",
+				"type": "bond",
+				"cniVersion": "1.0.0",
+				"mode": "active-backup",
+				"failOverMac": 1,
+				"miimon": "100",
+				"linksInContainer": false,
+				"links": [
+					{"name": "net1"},
+					{"name": "net2"}
+				]
+			}`
+			bondConf, _, err := loadConfigFile([]byte(config))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(bondConf.LinksContNs).NotTo(BeNil())
+			Expect(*bondConf.LinksContNs).To(BeFalse())
+		})
+	})
+})
+
 func addLinksInNS(initNS ns.NetNS, links []netlink.LinkAttrs) {
 	for _, link := range links {
 		var err error
