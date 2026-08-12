@@ -1,8 +1,6 @@
 module github.com/intel/bond-cni
 
-go 1.25.0
-
-toolchain go1.25.3
+go 1.26.0
 
 require (
 	github.com/containernetworking/cni v1.3.0

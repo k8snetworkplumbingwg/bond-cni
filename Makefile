@@ -15,5 +15,5 @@ unittest:
 		-v $(CURDIR):/workspace \
 		-v $(CURDIR)/.gomodcache:/go/pkg/mod \
 		-w /workspace \
-		golang:1.25 \
+		golang:1.26 \
 		go test -race -covermode=atomic -coverprofile=profile.out ./... $(ARG)

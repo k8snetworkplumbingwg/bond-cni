@@ -38,7 +38,7 @@ jobs:
     needs: build
     name: unit-test
     container:
-      image: golang:1.25
+      image: golang:1.26
       options: --privileged
     steps:
       - uses: actions/checkout@v7
