@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	github.com/containernetworking/cni v1.3.1
 	github.com/containernetworking/plugins v1.9.0
-	github.com/onsi/ginkgo/v2 v2.32.1
+	github.com/onsi/ginkgo/v2 v2.33.0
 	github.com/onsi/gomega v1.43.0
 	github.com/vishvananda/netlink v1.3.1
 	github.com/vishvananda/netns v0.0.5
