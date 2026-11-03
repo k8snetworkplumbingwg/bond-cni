@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"runtime"
 	"strconv"
 
@@ -39,7 +40,7 @@ import (
 type bondingConfig struct {
 	types.NetConf
 	Mode        string                   `json:"mode"`
-	LinksContNs bool                     `json:"linksInContainer"`
+	LinksContNs *bool                    `json:"linksInContainer"`
 	FailOverMac int                      `json:"failOverMac"`
 	Miimon      string                   `json:"miimon"`
 	Links       []map[string]interface{} `json:"links"`
@@ -95,6 +96,14 @@ func loadConfigFile(bytes []byte) (*bondingConfig, string, error) {
 
 	if bondConf.XmitHashPolicy != nil && netlink.StringToBondXmitHashPolicy(*bondConf.XmitHashPolicy) == netlink.BOND_XMIT_HASH_POLICY_UNKNOWN {
 		return nil, "", fmt.Errorf("xmitHashPolicy is not supported, actual: %+v", *bondConf.XmitHashPolicy)
+	}
+
+	if bondConf.LinksContNs == nil {
+		t := true
+		bondConf.LinksContNs = &t
+	} else if !*bondConf.LinksContNs {
+		fmt.Fprintf(os.Stderr, "bond-cni: linksInContainer: false is deprecated; "+
+			"use a chained plugin (host-device, SR-IOV) to bring interfaces into the pod netns\n")
 	}
 
 	return bondConf, bondConf.CNIVersion, nil
@@ -298,7 +307,7 @@ func createBond(bondName string, bondConf *bondingConfig, nspath string, ns ns.N
 	}
 	defer netNsHandle.Close()
 
-	if !bondConf.LinksContNs {
+	if !*bondConf.LinksContNs {
 		if err := setLinksInNetNs(bondConf, nspath, false); err != nil {
 			return nil, fmt.Errorf("failed to move the links (%+v) in container network namespace, error: %+v", bondConf.Links, err)
 		}
@@ -479,7 +488,7 @@ func cmdDel(args *skel.CmdArgs) error {
 		return fmt.Errorf("failed to delete bonded link (%+v), error: %+v", linkObjToDel.Attrs().Name, err)
 	}
 
-	if !bondConf.LinksContNs {
+	if !*bondConf.LinksContNs {
 		if err := setLinksInNetNs(bondConf, args.Netns, true); err != nil {
 			return fmt.Errorf("failed set links (%+v) in host network namespace, error: %+v", bondConf.Links, err)
 		}
