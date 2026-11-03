@@ -30,6 +30,7 @@ import (
 	"github.com/containernetworking/plugins/pkg/ipam"
 	"github.com/containernetworking/plugins/pkg/netlinksafe"
 	"github.com/containernetworking/plugins/pkg/ns"
+	"github.com/containernetworking/plugins/pkg/utils/sysctl"
 	"github.com/vishvananda/netlink"
 	"github.com/vishvananda/netns"
 
@@ -392,6 +393,9 @@ func cmdAdd(args *skel.CmdArgs) error {
 		result.Routes = ipamResult.Routes
 
 		err = netns.Do(func(_ ns.NetNS) error {
+			_, _ = sysctl.Sysctl(fmt.Sprintf("net/ipv4/conf/%s/arp_notify", args.IfName), "1")
+			_, _ = sysctl.Sysctl(fmt.Sprintf("net/ipv6/conf/%s/ndisc_notify", args.IfName), "1")
+
 			return ipam.ConfigureIface(args.IfName, result)
 		})
 		if err != nil {
